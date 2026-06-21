@@ -1,0 +1,54 @@
+{
+  "name": "@everlastingcrown/paperclip-slack-plugin",
+  "version": "0.0.0",
+  "description": "Paperclip plugin that sends event notifications to Slack channels",
+  "license": "MIT",
+  "author": "everlastingcrown",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/everlastingcrown/paperclip-slack-plugin"
+  },
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "paperclipPlugin": {
+    "manifest": "dist/manifest.js",
+    "worker": "dist/worker.js"
+  },
+  "scripts": {
+    "build": "pnpm run build:js && pnpm run build:types",
+    "build:js": "esbuild src/worker.ts src/manifest.ts --bundle --platform=node --target=node24 --format=esm --outdir=dist --external:@paperclipai/plugin-sdk",
+    "build:types": "tsc --emitDeclarationOnly --outDir dist",
+    "dev": "esbuild src/worker.ts src/manifest.ts --bundle --platform=node --target=node24 --format=esm --outdir=dist --external:@paperclipai/plugin-sdk --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "@slack/web-api": "^7.8.0"
+  },
+  "peerDependencies": {
+    "@paperclipai/plugin-sdk": "*"
+  },
+  "devDependencies": {
+    "@paperclipai/plugin-sdk": "2026.618.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.0",
+    "@semantic-release/npm": "^12.0.1",
+    "@slack/types": "^2.14.0",
+    "esbuild": "^0.25.0",
+    "semantic-release": "^24.2.0",
+    "typescript": "~5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
