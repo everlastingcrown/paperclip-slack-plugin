@@ -82,7 +82,21 @@ chore: update dependencies
 
 ## Release Process
 
-Releases are automated via GitHub Actions and `semantic-release`. Merging to `main` triggers:
+Releases are automated via GitHub Actions and `semantic-release`.
+
+### Canary releases
+
+Push or merge candidate changes to the long-lived `canary` branch to publish a prerelease build. Releasable Conventional Commits publish versions like `1.2.0-canary.1` to the `canary` npm dist-tag.
+
+Testers can install the latest canary build with:
+
+```bash
+pnpm add @everlastingcrown/paperclip-slack-plugin@canary
+```
+
+### Stable releases
+
+Merge validated changes to `main` when they are ready for users. Merging to `main` triggers:
 
 1. Version bump (based on commit messages)
 2. NPM publish to `@everlastingcrown/paperclip-slack-plugin`
