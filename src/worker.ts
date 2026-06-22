@@ -58,7 +58,7 @@ async function validateFullConfig(
       if (!eventCfg.channels || eventCfg.channels.length === 0) continue;
 
       for (const channel of eventCfg.channels) {
-        if (channel.startsWith("C") && /^C[A-Z0-9]+$/.test(channel)) {
+        if (/^[CG][A-Z0-9]+$/.test(channel)) {
           continue;
         }
 
@@ -69,14 +69,14 @@ async function validateFullConfig(
 
         if (!found) {
           errors.push(
-            `events.${eventKey}.channels: Channel "#${cleanName}" was not found in the workspace. Check the channel name or grant the bot access to this channel (invite the bot via /invite in Slack).`,
+            `events.${eventKey}.channels: Channel "#${cleanName}" was not found in the public channels list. Check the channel name, or use a Slack channel ID for private channels after inviting the bot.`,
           );
         }
       }
     }
   } catch (e: any) {
     errors.push(
-      `Could not verify channels: ${e.message}. Ensure the bot has the channels:read scope.`,
+      `Could not verify public channels: ${e.message}. Ensure the bot has the channels:read scope.`,
     );
   }
 

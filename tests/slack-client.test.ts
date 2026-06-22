@@ -89,6 +89,12 @@ describe("SlackClient", () => {
 
       expect(channels).toHaveLength(2);
       expect(channels[0]).toEqual({ id: "C001", name: "general" });
+      expect(mockConversationsList).toHaveBeenCalledWith({
+        types: "public_channel",
+        exclude_archived: true,
+        limit: 200,
+        cursor: undefined,
+      });
     });
 
     it("should handle pagination", async () => {
@@ -118,6 +124,14 @@ describe("SlackClient", () => {
       const result = await client.resolveChannel("C123ABC");
 
       expect(result).toBe("C123ABC");
+    });
+
+    it("should return private channel ID if already an ID", async () => {
+      const client = new SlackClient("xoxb-test-token");
+      const result = await client.resolveChannel("G123ABC");
+
+      expect(result).toBe("G123ABC");
+      expect(mockConversationsList).not.toHaveBeenCalled();
     });
 
     it("should resolve channel name to ID", async () => {

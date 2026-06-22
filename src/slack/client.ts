@@ -43,7 +43,7 @@ export class SlackClient {
 
     do {
       const result = await this.client.conversations.list({
-        types: "public_channel,private_channel",
+        types: "public_channel",
         exclude_archived: true,
         limit: 200,
         cursor,
@@ -62,7 +62,7 @@ export class SlackClient {
   }
 
   async resolveChannel(nameOrId: string): Promise<string | null> {
-    if (nameOrId.startsWith("C") && /^C[A-Z0-9]+$/.test(nameOrId)) {
+    if (/^[CG][A-Z0-9]+$/.test(nameOrId)) {
       return nameOrId;
     }
 
