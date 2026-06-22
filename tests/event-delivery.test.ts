@@ -134,6 +134,37 @@ describe("worker event delivery", () => {
     );
   });
 
+  it("uses entityId for issue.comment.created when the entity is an issue", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.comment.created": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.comment.created",
+      {
+        body: "I can reproduce this",
+        actorName: "Jane Smith",
+      },
+      { entityId: "iss_comment", entityType: "issue", companyId: "company-test" },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text: 'New comment on "Issue iss_comment" by Jane Smith',
+      }),
+    );
+  });
+
   it("detects issue status changes from issue.updated payloads", async () => {
     const harness = createTestHarness({
       manifest,

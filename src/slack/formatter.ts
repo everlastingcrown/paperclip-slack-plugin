@@ -41,18 +41,59 @@ export interface AgentErrorInfo {
 }
 
 export class SlackFormatter {
-  private paperclipUrl: string;
+  private paperclipUrl: string | null;
 
   constructor(paperclipUrl: string) {
-    this.paperclipUrl = paperclipUrl.replace(/\/+$/, "");
+    this.paperclipUrl = this.normalizeBaseUrl(paperclipUrl);
   }
 
-  private issueUrl(issueId: string): string {
+  private normalizeBaseUrl(value: string): string | null {
+    const trimmed = value.trim().replace(/\/+$/, "");
+    if (!trimmed) return null;
+
+    const withProtocol = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)
+      ? trimmed
+      : `https://${trimmed}`;
+
+    try {
+      const url = new URL(withProtocol);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+      return url.toString().replace(/\/+$/, "");
+    } catch {
+      return null;
+    }
+  }
+
+  private issueUrl(issueId: string): string | null {
+    if (!this.paperclipUrl) return null;
     return `${this.paperclipUrl}/issues/${issueId}`;
   }
 
-  private agentUrl(agentId: string): string {
+  private agentUrl(agentId: string): string | null {
+    if (!this.paperclipUrl) return null;
     return `${this.paperclipUrl}/agents/${agentId}`;
+  }
+
+  private linkedText(url: string | null, label: string): string {
+    return url ? `<${url}|${label}>` : label;
+  }
+
+  private viewButton(
+    url: string | null,
+    actionId: string,
+  ): KnownBlock | null {
+    if (!url) return null;
+    return {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "View in Paperclip", emoji: true },
+          url,
+          action_id: actionId,
+        },
+      ],
+    };
   }
 
   issueCreated(info: IssueInfo): { text: string; blocks: (Block | KnownBlock)[] } {
@@ -82,7 +123,7 @@ export class SlackFormatter {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*<${this.issueUrl(info.id)}|${info.title}>*`,
+          text: `*${this.linkedText(this.issueUrl(info.id), info.title)}*`,
         },
       },
     ];
@@ -102,17 +143,8 @@ export class SlackFormatter {
       });
     }
 
-    blocks.push({
-      type: "actions",
-      elements: [
-        {
-          type: "button",
-          text: { type: "plain_text", text: "View in Paperclip", emoji: true },
-          url: this.issueUrl(info.id),
-          action_id: "view-issue",
-        },
-      ],
-    });
+    const button = this.viewButton(this.issueUrl(info.id), "view-issue");
+    if (button) blocks.push(button);
 
     return { text, blocks };
   }
@@ -137,25 +169,20 @@ export class SlackFormatter {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*${info.author}* commented on *<${this.issueUrl(info.issueId)}|${info.issueTitle}>*`,
+          text: `*${info.author}* commented on *${this.linkedText(
+            this.issueUrl(info.issueId),
+            info.issueTitle,
+          )}*`,
         },
       },
       {
         type: "section",
         text: { type: "mrkdwn", text: truncatedBody },
       },
-      {
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: { type: "plain_text", text: "View in Paperclip", emoji: true },
-            url: this.issueUrl(info.issueId),
-            action_id: "view-issue",
-          },
-        ],
-      },
     ];
+
+    const button = this.viewButton(this.issueUrl(info.issueId), "view-issue");
+    if (button) blocks.push(button);
 
     return { text, blocks };
   }
@@ -176,7 +203,10 @@ export class SlackFormatter {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*<${this.issueUrl(info.issueId)}|${info.issueTitle}>*`,
+          text: `*${this.linkedText(
+            this.issueUrl(info.issueId),
+            info.issueTitle,
+          )}*`,
         },
       },
       {
@@ -196,26 +226,19 @@ export class SlackFormatter {
           },
         ],
       },
-      {
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: { type: "plain_text", text: "View in Paperclip", emoji: true },
-            url: this.issueUrl(info.issueId),
-            action_id: "view-issue",
-          },
-        ],
-      },
     ];
+
+    const button = this.viewButton(this.issueUrl(info.issueId), "view-issue");
+    if (button) blocks.push(button);
 
     return { text, blocks };
   }
 
   approvalCreated(info: ApprovalInfo): { text: string; blocks: (Block | KnownBlock)[] } {
-    const issueRef = info.issueTitle
-      ? `*<${this.issueUrl(info.issueId!)}|${info.issueTitle}>*`
-      : `Issue ${info.issueId}`;
+    const issueRef =
+      info.issueId && info.issueTitle
+        ? `*${this.linkedText(this.issueUrl(info.issueId), info.issueTitle)}*`
+        : `Issue ${info.issueId}`;
     const text = `Approval requested for ${info.issueTitle ?? info.issueId}`;
 
     const blocks: (Block | KnownBlock)[] = [
@@ -257,17 +280,8 @@ export class SlackFormatter {
     }
 
     if (info.issueId) {
-      blocks.push({
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: { type: "plain_text", text: "View in Paperclip", emoji: true },
-            url: this.issueUrl(info.issueId),
-            action_id: "view-issue",
-          },
-        ],
-      });
+      const button = this.viewButton(this.issueUrl(info.issueId), "view-issue");
+      if (button) blocks.push(button);
     }
 
     return { text, blocks };
@@ -275,9 +289,10 @@ export class SlackFormatter {
 
   approvalDecided(info: ApprovalInfo): { text: string; blocks: (Block | KnownBlock)[] } {
     const decision = info.decision ?? "decided";
-    const issueRef = info.issueTitle
-      ? `*<${this.issueUrl(info.issueId!)}|${info.issueTitle}>*`
-      : `Issue ${info.issueId}`;
+    const issueRef =
+      info.issueId && info.issueTitle
+        ? `*${this.linkedText(this.issueUrl(info.issueId), info.issueTitle)}*`
+        : `Issue ${info.issueId}`;
     const text = `Approval ${decision} for ${info.issueTitle ?? info.issueId}`;
 
     const blocks: (Block | KnownBlock)[] = [
@@ -319,17 +334,8 @@ export class SlackFormatter {
     }
 
     if (info.issueId) {
-      blocks.push({
-        type: "actions",
-        elements: [
-          {
-            type: "button",
-            text: { type: "plain_text", text: "View in Paperclip", emoji: true },
-            url: this.issueUrl(info.issueId),
-            action_id: "view-issue",
-          },
-        ],
-      });
+      const button = this.viewButton(this.issueUrl(info.issueId), "view-issue");
+      if (button) blocks.push(button);
     }
 
     return { text, blocks };
@@ -355,7 +361,10 @@ export class SlackFormatter {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `*Agent:* <${this.agentUrl(info.agentId)}|${info.agentName}>`,
+          text: `*Agent:* ${this.linkedText(
+            this.agentUrl(info.agentId),
+            info.agentName,
+          )}`,
         },
       },
       {
@@ -373,17 +382,8 @@ export class SlackFormatter {
       });
     }
 
-    blocks.push({
-      type: "actions",
-      elements: [
-        {
-          type: "button",
-          text: { type: "plain_text", text: "View in Paperclip", emoji: true },
-          url: this.agentUrl(info.agentId),
-          action_id: "view-agent",
-        },
-      ],
-    });
+    const button = this.viewButton(this.agentUrl(info.agentId), "view-agent");
+    if (button) blocks.push(button);
 
     return { text, blocks };
   }

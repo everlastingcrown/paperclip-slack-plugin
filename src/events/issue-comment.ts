@@ -2,7 +2,7 @@ import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 import { getConfig } from "../config.js";
 import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
-import { getPayloadString, resolveActorName } from "./utils.js";
+import { getPayloadRecord, getPayloadString, resolveActorName } from "./utils.js";
 
 export async function handleIssueCommentCreated(
   ctx: PluginContext,
@@ -15,16 +15,32 @@ export async function handleIssueCommentCreated(
   const companyId = event.companyId;
 
   try {
-    const issueId = getPayloadString(
-      event,
-      "issueId",
-      "issue.id",
-      "data.issue.id",
-      "comment.issueId",
-      "data.comment.issueId",
-      "comment.issue.id",
-      "target.issueId",
-    );
+    const eventIssueId =
+      event.entityType === "issue" ? event.entityId : undefined;
+    const issueId =
+      eventIssueId ??
+      getPayloadString(
+        event,
+        "issueId",
+        "issue_id",
+        "parentIssueId",
+        "issue.id",
+        "data.issue.id",
+        "comment.issueId",
+        "comment.issue_id",
+        "data.comment.issueId",
+        "data.comment.issue_id",
+        "comment.issue.id",
+        "issueComment.issueId",
+        "issueComment.issue_id",
+        "issueComment.issue.id",
+        "parentIssue.id",
+        "parent.id",
+        "target.issueId",
+        "target.issue_id",
+        "target.issue.id",
+        "target.id",
+      );
     const commentBody =
       getPayloadString(
         event,
@@ -40,9 +56,15 @@ export async function handleIssueCommentCreated(
       ) ?? "";
 
     if (!issueId) {
+      const payload = getPayloadRecord(event);
       ctx.logger.warn(
         "Could not determine issue ID for issue.comment.created event",
-        { eventId: event.eventId },
+        {
+          eventId: event.eventId,
+          entityId: event.entityId,
+          entityType: event.entityType,
+          payloadKeys: payload ? Object.keys(payload).sort() : [],
+        },
       );
       return;
     }

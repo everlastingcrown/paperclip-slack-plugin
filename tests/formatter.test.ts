@@ -207,5 +207,34 @@ describe("SlackFormatter", () => {
         "http://example.com/issues/iss-001",
       );
     });
+
+    it("should add https to bare host URLs", () => {
+      const fm = new SlackFormatter("paperclip.example.com");
+      const result = fm.issueCreated({
+        id: "iss-001",
+        title: "Test",
+      });
+
+      const buttonBlock = result.blocks[2] as {
+        elements: Array<{ url: string }>;
+      };
+      expect(buttonBlock.elements[0].url).toBe(
+        "https://paperclip.example.com/issues/iss-001",
+      );
+    });
+
+    it("should omit links and buttons when URL is invalid", () => {
+      const fm = new SlackFormatter("not a url");
+      const result = fm.issueCreated({
+        id: "iss-001",
+        title: "Test",
+      });
+
+      expect(result.blocks).toHaveLength(2);
+      expect(result.blocks[1]).toMatchObject({
+        type: "section",
+        text: { text: "*Test*" },
+      });
+    });
   });
 });
