@@ -6,6 +6,8 @@ export interface ChannelInfo {
   name: string;
 }
 
+type ChannelListType = "public_channel" | "private_channel";
+
 export class SlackClient {
   private client: WebClient;
 
@@ -37,13 +39,13 @@ export class SlackClient {
     return { ts: result.ts ?? "", channel: result.channel ?? "" };
   }
 
-  async listChannels(): Promise<ChannelInfo[]> {
+  async listChannels(type: ChannelListType = "public_channel"): Promise<ChannelInfo[]> {
     const channels: ChannelInfo[] = [];
     let cursor: string | undefined;
 
     do {
       const result = await this.client.conversations.list({
-        types: "public_channel",
+        types: type,
         exclude_archived: true,
         limit: 200,
         cursor,
@@ -67,10 +69,18 @@ export class SlackClient {
     }
 
     const cleanName = nameOrId.replace(/^#/, "");
-    const channels = await this.listChannels();
-    const found = channels.find(
+    const publicChannels = await this.listChannels("public_channel");
+    const publicChannel = publicChannels.find(
       (ch) => ch.name.toLowerCase() === cleanName.toLowerCase(),
     );
-    return found?.id ?? null;
+    if (publicChannel) {
+      return publicChannel.id;
+    }
+
+    const privateChannels = await this.listChannels("private_channel");
+    const privateChannel = privateChannels.find(
+      (ch) => ch.name.toLowerCase() === cleanName.toLowerCase(),
+    );
+    return privateChannel?.id ?? null;
   }
 }

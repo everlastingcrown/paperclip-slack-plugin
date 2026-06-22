@@ -148,14 +148,46 @@ describe("SlackClient", () => {
       const result = await client.resolveChannel("#general");
 
       expect(result).toBe("C001");
+      expect(mockConversationsList).toHaveBeenCalledTimes(1);
+    });
+
+    it("should resolve private channel name to ID", async () => {
+      mockConversationsList
+        .mockResolvedValueOnce({
+          ok: true,
+          channels: [{ id: "C001", name: "general" }],
+          response_metadata: {},
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          channels: [{ id: "G001", name: "leadership" }],
+          response_metadata: {},
+        });
+
+      const client = new SlackClient("xoxb-test-token");
+      const result = await client.resolveChannel("#leadership");
+
+      expect(result).toBe("G001");
+      expect(mockConversationsList).toHaveBeenNthCalledWith(2, {
+        types: "private_channel",
+        exclude_archived: true,
+        limit: 200,
+        cursor: undefined,
+      });
     });
 
     it("should return null for unknown channel", async () => {
-      mockConversationsList.mockResolvedValueOnce({
-        ok: true,
-        channels: [{ id: "C001", name: "general" }],
-        response_metadata: {},
-      });
+      mockConversationsList
+        .mockResolvedValueOnce({
+          ok: true,
+          channels: [{ id: "C001", name: "general" }],
+          response_metadata: {},
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          channels: [{ id: "G001", name: "leadership" }],
+          response_metadata: {},
+        });
 
       const client = new SlackClient("xoxb-test-token");
       const result = await client.resolveChannel("#nonexistent");

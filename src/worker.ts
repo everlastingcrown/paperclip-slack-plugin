@@ -49,7 +49,8 @@ async function validateFullConfig(
   }
 
   try {
-    const workspaceChannels = await slack.listChannels();
+    const publicChannels = await slack.listChannels("public_channel");
+    let privateChannels: Awaited<ReturnType<SlackClient["listChannels"]>> | null = null;
     const configEvents = config.events;
 
     for (const eventKey of Object.keys(configEvents) as EventKey[]) {
@@ -63,13 +64,29 @@ async function validateFullConfig(
         }
 
         const cleanName = channel.replace(/^#/, "");
-        const found = workspaceChannels.some(
+        const foundPublic = publicChannels.some(
+          (ch) => ch.name.toLowerCase() === cleanName.toLowerCase(),
+        );
+        if (foundPublic) continue;
+
+        if (privateChannels === null) {
+          try {
+            privateChannels = await slack.listChannels("private_channel");
+          } catch (e: any) {
+            errors.push(
+              `events.${eventKey}.channels: Channel "#${cleanName}" was not found in the public channels list. If this is a private channel, grant the bot groups:read and invite it to the channel, or configure the Slack channel ID.`,
+            );
+            continue;
+          }
+        }
+
+        const foundPrivate = privateChannels.some(
           (ch) => ch.name.toLowerCase() === cleanName.toLowerCase(),
         );
 
-        if (!found) {
+        if (!foundPrivate) {
           errors.push(
-            `events.${eventKey}.channels: Channel "#${cleanName}" was not found in the public channels list. Check the channel name, or use a Slack channel ID for private channels after inviting the bot.`,
+            `events.${eventKey}.channels: Channel "#${cleanName}" was not found in the workspace channels visible to this bot. Check the channel name and ensure the bot has been invited to private channels.`,
           );
         }
       }

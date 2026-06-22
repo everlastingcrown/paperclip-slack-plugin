@@ -29,7 +29,7 @@ const manifest: PaperclipPluginManifestV1 = {
         type: "string",
         title: "Slack Bot OAuth Token",
         description:
-          "Bot token from api.slack.com (starts with xoxb-). The bot must have chat:write and channels:read scopes. For private channels, invite the bot and configure the Slack channel ID.",
+          "Bot token from api.slack.com (starts with xoxb-). The bot must have chat:write and channels:read scopes. To resolve private channels by name, also grant groups:read and invite the bot to the channel.",
       },
       paperclipUrl: {
         type: "string",
@@ -42,7 +42,7 @@ const manifest: PaperclipPluginManifestV1 = {
         type: "object",
         title: "Event Notifications",
         description:
-          "Toggle and route each event type to Slack channels. Public channels can be names (#general) or IDs (C0123456). Private channels should use IDs (G0123456).",
+          "Toggle and route each event type to Slack channels. Public channels can be names (#general) or IDs (C0123456). Private channels can be names with groups:read or IDs (G0123456).",
         properties: {
           "issue.created": {
             type: "object",

@@ -32,7 +32,8 @@ paperclipai plugin install ~/path/to/paperclip-slack-plugin
 2. Create a new app from scratch
 3. Under **OAuth & Permissions**, add these **Bot Token Scopes**:
    - `chat:write` — send messages
-   - `channels:read` — list channels for validation
+   - `channels:read` — list public channels for validation and name lookup
+   - `groups:read` — optional; list private channels for validation and name lookup
 4. Install to your workspace and copy the **Bot OAuth Token** (starts with `xoxb-`)
 5. Invite the bot to each channel you want notifications in (`/invite @bot-name`)
 
@@ -59,7 +60,18 @@ Each event type has its own configuration:
 | Approval Decided | `#general` | When an approval is approved or rejected |
 | Agent Run Failed | `#alerts` | When an agent run fails with an error |
 
-Channels can be specified as names (`#general`), names without hash (`general`), or IDs (`C0123456`).
+### Channel Names, IDs, and Private Channels
+
+Channels can be specified as:
+
+| Channel type | Supported values | Required Slack scopes | Notes |
+|---|---|---|---|
+| Public channel | `#general`, `general`, or `C0123456` | `channels:read`, `chat:write` | The bot must be invited before it can post. |
+| Private channel | `#leadership`, `leadership`, or `G0123456` | `groups:read`, `chat:write` for names; `chat:write` for IDs | The bot must be invited to the private channel. |
+
+If you do not want to grant `groups:read`, configure private channels with their Slack channel ID (`G0123456`) instead of `#channel-name`.
+
+During validation, the plugin checks public channel names first. If a configured channel name is not found publicly, it tries private channel lookup when the token has `groups:read`. Public-only setups do not need `groups:read`.
 
 ### Example Config
 
