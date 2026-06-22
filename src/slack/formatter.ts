@@ -151,10 +151,11 @@ export class SlackFormatter {
 
   issueCommentCreated(info: CommentInfo): { text: string; blocks: (Block | KnownBlock)[] } {
     const text = `New comment on "${info.issueTitle}" by ${info.author}`;
+    const body = info.body.trim();
     const truncatedBody =
-      info.body.length > 500
-        ? info.body.substring(0, 500) + "..."
-        : info.body;
+      body.length > 500
+        ? body.substring(0, 500) + "..."
+        : body;
 
     const blocks: (Block | KnownBlock)[] = [
       {
@@ -175,11 +176,14 @@ export class SlackFormatter {
           )}*`,
         },
       },
-      {
+    ];
+
+    if (truncatedBody) {
+      blocks.push({
         type: "section",
         text: { type: "mrkdwn", text: truncatedBody },
-      },
-    ];
+      });
+    }
 
     const button = this.viewButton(this.issueUrl(info.issueId), "view-issue");
     if (button) blocks.push(button);

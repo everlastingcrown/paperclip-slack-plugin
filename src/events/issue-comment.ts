@@ -50,9 +50,18 @@ export async function handleIssueCommentCreated(
         "comment.body",
         "comment.content",
         "comment.text",
+        "comment.message",
+        "comment.markdown",
         "data.comment.body",
         "data.comment.content",
         "data.comment.text",
+        "data.comment.message",
+        "data.comment.markdown",
+        "issueComment.body",
+        "issueComment.content",
+        "issueComment.text",
+        "issueComment.message",
+        "issueComment.markdown",
       ) ?? "";
 
     if (!issueId) {

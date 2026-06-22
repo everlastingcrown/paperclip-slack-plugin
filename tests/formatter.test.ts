@@ -89,6 +89,18 @@ describe("SlackFormatter", () => {
         text: { text: expect.stringContaining("New comment") },
       });
     });
+
+    it("should omit comment body block when body is empty", () => {
+      const result = formatter.issueCommentCreated({
+        issueId: "iss-001",
+        issueTitle: "Fix login crash",
+        author: "Jane Smith",
+        body: "",
+      });
+
+      expect(result.blocks).toHaveLength(3);
+      expect(result.blocks[2]).toMatchObject({ type: "actions" });
+    });
   });
 
   describe("issueStatusChanged", () => {
