@@ -12,11 +12,16 @@
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
     [
-      "@semantic-release/npm",
+      "./node_modules/@semantic-release/npm",
       {
         "pkgRoot": "."
       }
     ],
-    "@semantic-release/github"
+    [
+      "@semantic-release/github",
+      {
+        "failCommentCondition": false
+      }
+    ]
   ]
 }
