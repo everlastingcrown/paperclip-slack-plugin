@@ -10,6 +10,66 @@ import { registerAllHandlers } from "./events/index.js";
 import { SlackClient } from "./slack/client.js";
 import type { PluginConfig, EventKey } from "./types.js";
 
+function getEnabledChannels(config: PluginConfig): string[] {
+  const channels = new Set<string>();
+
+  for (const eventCfg of Object.values(config.events)) {
+    if (!eventCfg?.enabled || !eventCfg.channels) continue;
+
+    for (const channel of eventCfg.channels) {
+      const trimmed = channel.trim();
+      if (trimmed) {
+        channels.add(trimmed);
+      }
+    }
+  }
+
+  return [...channels];
+}
+
+async function sendConfigTestMessages(
+  slack: SlackClient,
+  config: PluginConfig,
+): Promise<string[]> {
+  const errors: string[] = [];
+  const channels = getEnabledChannels(config);
+
+  for (const channel of channels) {
+    let resolved: string | null;
+    try {
+      resolved = await slack.resolveChannel(channel);
+    } catch (e: any) {
+      errors.push(
+        `Could not resolve channel "${channel}" for test message: ${e.message}`,
+      );
+      continue;
+    }
+
+    if (!resolved) {
+      errors.push(`Could not resolve channel "${channel}" for test message.`);
+      continue;
+    }
+
+    try {
+      await slack.postMessage(resolved, "Paperclip Slack plugin test: hello world", [
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: "Paperclip Slack plugin test: hello world",
+          },
+        },
+      ]);
+    } catch (e: any) {
+      errors.push(
+        `Could not send test message to "${channel}": ${e.message}`,
+      );
+    }
+  }
+
+  return errors;
+}
+
 async function validateFullConfig(
   config: PluginConfig,
 ): Promise<string[]> {
@@ -95,6 +155,10 @@ async function validateFullConfig(
     errors.push(
       `Could not verify public channels: ${e.message}. Ensure the bot has the channels:read scope.`,
     );
+  }
+
+  if (errors.length === 0) {
+    errors.push(...(await sendConfigTestMessages(slack, config)));
   }
 
   return errors;
