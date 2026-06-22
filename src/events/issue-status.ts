@@ -2,7 +2,7 @@ import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 import { getConfig } from "../config.js";
 import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
-import { resolveActorName } from "./utils.js";
+import { getEventString, resolveActorName } from "./utils.js";
 
 export async function handleIssueUpdated(
   ctx: PluginContext,
@@ -12,9 +12,14 @@ export async function handleIssueUpdated(
   const eventCfg = config.events["issue.statusChanged"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 
-  const issueId = event.entityId;
+  const issueId = getEventString(event, "issueId");
   const companyId = event.companyId;
-  if (!issueId) return;
+  if (!issueId) {
+    ctx.logger.warn("Could not determine issue ID for issue.updated event", {
+      eventId: event.eventId,
+    });
+    return;
+  }
 
   try {
     const issue = await ctx.issues.get(issueId, companyId);

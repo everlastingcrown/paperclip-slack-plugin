@@ -1,5 +1,22 @@
 import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 
+export function getEventString(
+  event: PluginEvent,
+  ...payloadKeys: string[]
+): string | undefined {
+  if (event.entityId) return event.entityId;
+
+  const payload = event.payload as Record<string, unknown> | undefined;
+  for (const key of payloadKeys) {
+    const value = payload?.[key];
+    if (typeof value === "string" && value.trim()) {
+      return value;
+    }
+  }
+
+  return undefined;
+}
+
 export async function resolveActorName(
   ctx: PluginContext,
   event: PluginEvent,
