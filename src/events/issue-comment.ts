@@ -2,7 +2,7 @@ import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 import { getConfig } from "../config.js";
 import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
-import { resolveActorName } from "./utils.js";
+import { getPayloadString, resolveActorName } from "./utils.js";
 
 export async function handleIssueCommentCreated(
   ctx: PluginContext,
@@ -15,11 +15,29 @@ export async function handleIssueCommentCreated(
   const companyId = event.companyId;
 
   try {
-    const payload = event.payload as Record<string, unknown> | undefined;
-    const issueId =
-      (payload?.issueId as string) ?? ((payload as any)?.issue?.id as string);
+    const issueId = getPayloadString(
+      event,
+      "issueId",
+      "issue.id",
+      "data.issue.id",
+      "comment.issueId",
+      "data.comment.issueId",
+      "comment.issue.id",
+      "target.issueId",
+    );
     const commentBody =
-      (payload?.body as string) ?? (payload?.content as string) ?? "";
+      getPayloadString(
+        event,
+        "body",
+        "content",
+        "text",
+        "comment.body",
+        "comment.content",
+        "comment.text",
+        "data.comment.body",
+        "data.comment.content",
+        "data.comment.text",
+      ) ?? "";
 
     if (!issueId) {
       ctx.logger.warn(
@@ -29,15 +47,14 @@ export async function handleIssueCommentCreated(
       return;
     }
 
-    let issueTitle = "Unknown issue";
-    try {
-      const issue = await ctx.issues.get(issueId, companyId);
-      if (issue) {
-        issueTitle = issue.title;
-      }
-    } catch {
-      // fallback to default
-    }
+    const issueTitle =
+      getPayloadString(
+        event,
+        "issueTitle",
+        "issue.title",
+        "data.issue.title",
+        "comment.issue.title",
+      ) ?? `Issue ${issueId}`;
 
     const author = await resolveActorName(ctx, event, companyId);
 

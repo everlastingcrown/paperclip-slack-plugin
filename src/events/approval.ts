@@ -2,7 +2,7 @@ import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 import { getConfig } from "../config.js";
 import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
-import { resolveActorName } from "./utils.js";
+import { getPayloadString, resolveActorName } from "./utils.js";
 
 export async function handleApprovalCreated(
   ctx: PluginContext,
@@ -37,33 +37,35 @@ async function handleApproval(
   if (!approvalId) return;
 
   try {
-    const payload = event.payload as Record<string, unknown> | undefined;
-    const issueId =
-      (payload?.issueId as string) ?? ((payload as any)?.issue?.id as string | undefined);
+    const issueId = getPayloadString(
+      event,
+      "issueId",
+      "issue.id",
+      "data.issue.id",
+      "approval.issueId",
+    );
 
-    let issueTitle: string | undefined;
-    if (issueId) {
-      try {
-        const issue = await ctx.issues.get(issueId, companyId);
-        if (issue) {
-          issueTitle = issue.title;
-        } else {
-          issueTitle = issueId;
-        }
-      } catch {
-        issueTitle = issueId;
-      }
-    }
+    const issueTitle =
+      getPayloadString(
+        event,
+        "issueTitle",
+        "issue.title",
+        "data.issue.title",
+        "approval.issue.title",
+      ) ?? issueId;
 
     const approver = await resolveActorName(ctx, event, companyId);
     const decision =
       kind === "decided"
-        ? ((payload?.decision as string) ?? (payload?.outcome as string))
+        ? getPayloadString(event, "decision", "outcome", "approval.decision")
         : undefined;
-    const comment =
-      (payload?.comment as string) ??
-      (payload?.reason as string) ??
-      (payload?.description as string);
+    const comment = getPayloadString(
+      event,
+      "comment",
+      "reason",
+      "description",
+      "approval.comment",
+    );
 
     const formatter = new SlackFormatter(getConfig().paperclipUrl);
     let message: { text: string; blocks: any[] };

@@ -2,7 +2,12 @@ import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 import { getConfig } from "../config.js";
 import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
-import { getEventString, resolveActorName } from "./utils.js";
+import {
+  getEventString,
+  getIssueSnapshot,
+  getPayloadString,
+  resolveActorName,
+} from "./utils.js";
 
 export async function handleIssueUpdated(
   ctx: PluginContext,
@@ -12,7 +17,17 @@ export async function handleIssueUpdated(
   const eventCfg = config.events["issue.statusChanged"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 
-  const issueId = getEventString(event, "issueId");
+  const issue = getIssueSnapshot(event);
+  const issueId =
+    issue?.id ??
+    getEventString(
+      event,
+      "issueId",
+      "issue.id",
+      "data.issue.id",
+      "after.id",
+      "current.id",
+    );
   const companyId = event.companyId;
   if (!issueId) {
     ctx.logger.warn("Could not determine issue ID for issue.updated event", {
@@ -22,13 +37,24 @@ export async function handleIssueUpdated(
   }
 
   try {
-    const issue = await ctx.issues.get(issueId, companyId);
-    if (!issue) {
-      ctx.logger.warn("Issue not found for status change check", { issueId });
+    const newStatus =
+      issue?.status ??
+      getPayloadString(
+        event,
+        "status",
+        "newStatus",
+        "issue.status",
+        "data.issue.status",
+        "after.status",
+        "current.status",
+      );
+    if (!newStatus) {
+      ctx.logger.warn("Could not determine issue status for issue.updated event", {
+        eventId: event.eventId,
+        issueId,
+      });
       return;
     }
-
-    const newStatus = issue.status;
 
     const stateKey = "last-status";
     const prevStatus = await ctx.state.get({
@@ -53,7 +79,17 @@ export async function handleIssueUpdated(
     }
 
     const changedBy = await resolveActorName(ctx, event, companyId);
-    const issueTitle = issue.title ?? "Untitled";
+    const issueTitle =
+      issue?.title ??
+      getPayloadString(
+        event,
+        "issueTitle",
+        "issue.title",
+        "data.issue.title",
+        "after.title",
+        "current.title",
+      ) ??
+      `Issue ${issueId}`;
 
     const formatter = new SlackFormatter(config.paperclipUrl);
     const message = formatter.issueStatusChanged({

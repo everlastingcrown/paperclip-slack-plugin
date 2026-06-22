@@ -2,7 +2,7 @@ import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 import { getConfig } from "../config.js";
 import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
-import { getEventString, resolveActorName } from "./utils.js";
+import { getIssueSnapshot } from "./utils.js";
 
 export async function handleIssueCreated(
   ctx: PluginContext,
@@ -12,35 +12,18 @@ export async function handleIssueCreated(
   const eventCfg = config.events["issue.created"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 
-  const issueId = getEventString(event, "issueId");
-  const companyId = event.companyId;
-  if (!issueId) {
+  const issue = getIssueSnapshot(event);
+  if (!issue) {
     ctx.logger.warn("Could not determine issue ID for issue.created event", {
       eventId: event.eventId,
     });
     return;
   }
 
+  const issueId = issue.id;
+
   try {
-    const issue = await ctx.issues.get(issueId, companyId);
-    if (!issue) {
-      ctx.logger.warn("Issue not found for issue.created event", { issueId });
-      return;
-    }
-
-    const reporter = await resolveActorName(ctx, event, companyId);
-
-    let projectName: string | undefined;
-    if (issue.projectId) {
-      try {
-        const project = await ctx.projects.get(issue.projectId, companyId);
-        if (project) {
-          projectName = project.name;
-        }
-      } catch {
-        projectName = issue.projectId;
-      }
-    }
+    const projectName = issue.projectName ?? issue.projectId;
 
     const formatter = new SlackFormatter(config.paperclipUrl);
     const message = formatter.issueCreated({

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createTestHarness } from "@paperclipai/plugin-sdk/testing";
-import type { Issue } from "@paperclipai/shared";
 
 const mockPostMessage = vi.fn();
 const mockConversationsList = vi.fn();
@@ -42,50 +41,18 @@ describe("worker event delivery", () => {
       },
     });
 
-    harness.seed({
-      issues: [
-        {
-          id: "iss_1",
-          companyId: "company-test",
-          projectId: null,
-          projectWorkspaceId: null,
-          goalId: null,
-          parentId: null,
-          title: "Test issue",
-          description: "Created from the event harness",
-          status: "open",
-          workMode: "plan_then_execute",
-          priority: "normal",
-          assigneeAgentId: null,
-          assigneeUserId: null,
-          checkoutRunId: null,
-          executionRunId: null,
-          executionAgentNameKey: null,
-          executionLockedAt: null,
-          createdByAgentId: null,
-          createdByUserId: null,
-          issueNumber: null,
-          identifier: null,
-          requestDepth: 0,
-          billingCode: null,
-          assigneeAdapterOverrides: null,
-          executionWorkspaceId: null,
-          executionWorkspacePreference: null,
-          executionWorkspaceSettings: null,
-          startedAt: null,
-          completedAt: null,
-          cancelledAt: null,
-          hiddenAt: null,
-          createdAt: new Date("2026-06-22T00:00:00Z"),
-          updatedAt: new Date("2026-06-22T00:00:00Z"),
-        } as Issue,
-      ],
-    });
-
     await plugin.definition.setup(harness.ctx);
     await harness.emit(
       "issue.created",
-      { issueId: "iss_1" },
+      {
+        issue: {
+          id: "iss_1",
+          title: "Test issue",
+          description: "Created from the event harness",
+          status: "open",
+          priority: "normal",
+        },
+      },
       { entityId: "iss_1", entityType: "issue", companyId: "company-test" },
     );
 
@@ -110,50 +77,10 @@ describe("worker event delivery", () => {
       },
     });
 
-    harness.seed({
-      issues: [
-        {
-          id: "iss_payload",
-          companyId: "company-test",
-          projectId: null,
-          projectWorkspaceId: null,
-          goalId: null,
-          parentId: null,
-          title: "Payload issue",
-          description: null,
-          status: "open",
-          workMode: "plan_then_execute",
-          priority: "normal",
-          assigneeAgentId: null,
-          assigneeUserId: null,
-          checkoutRunId: null,
-          executionRunId: null,
-          executionAgentNameKey: null,
-          executionLockedAt: null,
-          createdByAgentId: null,
-          createdByUserId: null,
-          issueNumber: null,
-          identifier: null,
-          requestDepth: 0,
-          billingCode: null,
-          assigneeAdapterOverrides: null,
-          executionWorkspaceId: null,
-          executionWorkspacePreference: null,
-          executionWorkspaceSettings: null,
-          startedAt: null,
-          completedAt: null,
-          cancelledAt: null,
-          hiddenAt: null,
-          createdAt: new Date("2026-06-22T00:00:00Z"),
-          updatedAt: new Date("2026-06-22T00:00:00Z"),
-        } as Issue,
-      ],
-    });
-
     await plugin.definition.setup(harness.ctx);
     await harness.emit(
       "issue.created",
-      { issueId: "iss_payload" },
+      { issueId: "iss_payload", title: "Payload issue" },
       { entityType: "issue", companyId: "company-test" },
     );
 
@@ -162,6 +89,87 @@ describe("worker event delivery", () => {
       expect.objectContaining({
         channel: "C001",
         text: "New issue created: Payload issue",
+      }),
+    );
+  });
+
+  it("uses nested issue IDs for issue.comment.created payloads", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.comment.created": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.comment.created",
+      {
+        comment: {
+          issueId: "iss_comment",
+          body: "I can reproduce this",
+        },
+        issue: {
+          title: "Comment target",
+        },
+        actorName: "Jane Smith",
+      },
+      {
+        entityId: "comment_1",
+        entityType: "issue_comment",
+        companyId: "company-test",
+      },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text: 'New comment on "Comment target" by Jane Smith',
+      }),
+    );
+  });
+
+  it("detects issue status changes from issue.updated payloads", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.statusChanged": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.updated",
+      { issue: { id: "iss_status", title: "Status target", status: "open" } },
+      { entityId: "iss_status", entityType: "issue", companyId: "company-test" },
+    );
+    await harness.emit(
+      "issue.updated",
+      {
+        issue: {
+          id: "iss_status",
+          title: "Status target",
+          status: "in_progress",
+        },
+        actorName: "Jane Smith",
+      },
+      { entityId: "iss_status", entityType: "issue", companyId: "company-test" },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text: 'Issue "Status target" status changed: open → in_progress',
       }),
     );
   });

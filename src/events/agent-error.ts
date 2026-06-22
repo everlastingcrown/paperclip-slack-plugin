@@ -2,6 +2,7 @@ import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 import { getConfig } from "../config.js";
 import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
+import { getPayloadString } from "./utils.js";
 
 export async function handleAgentRunFailed(
   ctx: PluginContext,
@@ -11,31 +12,20 @@ export async function handleAgentRunFailed(
   const eventCfg = config.events["agent.run.failed"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 
-  const companyId = event.companyId;
-
   try {
-    const payload = event.payload as Record<string, unknown> | undefined;
-    const agentId = (payload?.agentId as string) ?? event.entityId;
-    const runId = (payload?.runId as string) ?? event.entityId;
+    const agentId =
+      getPayloadString(event, "agentId", "agent.id", "data.agent.id") ??
+      event.entityId;
+    const runId = getPayloadString(event, "runId", "run.id") ?? event.entityId;
 
     if (!agentId) return;
 
-    let agentName = "Unknown agent";
-    try {
-      const agent = await ctx.agents.get(agentId, companyId);
-      if (agent) {
-        agentName = agent.name;
-      } else {
-        agentName = `Agent ${agentId}`;
-      }
-    } catch {
-      agentName = `Agent ${agentId}`;
-    }
+    const agentName =
+      getPayloadString(event, "agentName", "agent.name", "data.agent.name") ??
+      `Agent ${agentId}`;
 
     const errorMessage =
-      (payload?.error as string) ??
-      (payload?.message as string) ??
-      (payload?.reason as string) ??
+      getPayloadString(event, "error", "message", "reason", "run.error") ??
       "Unknown error";
 
     const formatter = new SlackFormatter(config.paperclipUrl);
