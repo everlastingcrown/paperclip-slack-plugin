@@ -24,9 +24,9 @@
   },
   "scripts": {
     "build": "pnpm run build:js && pnpm run build:types",
-    "build:js": "esbuild src/worker.ts src/manifest.ts --bundle --platform=node --target=node24 --format=esm --outdir=dist --external:@paperclipai/plugin-sdk",
+    "build:js": "esbuild src/worker.ts src/manifest.ts --bundle --platform=node --target=node24 --format=esm --outdir=dist --external:@paperclipai/plugin-sdk --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
     "build:types": "tsc --emitDeclarationOnly --outDir dist",
-    "dev": "esbuild src/worker.ts src/manifest.ts --bundle --platform=node --target=node24 --format=esm --outdir=dist --external:@paperclipai/plugin-sdk --watch",
+    "dev": "esbuild src/worker.ts src/manifest.ts --bundle --platform=node --target=node24 --format=esm --outdir=dist --external:@paperclipai/plugin-sdk --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepublishOnly": "pnpm run build"
