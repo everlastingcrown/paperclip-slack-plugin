@@ -187,6 +187,57 @@ describe("worker event delivery", () => {
     );
   });
 
+  it("fetches comment body when the issue.comment.created payload only has IDs", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.comment.created": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+    vi.spyOn(harness.ctx.issues, "listComments").mockResolvedValue([
+      {
+        id: "comment_1",
+        issueId: "iss_comment",
+        body: "Fetched from stored comment",
+      } as any,
+    ]);
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.comment.created",
+      {
+        issueId: "iss_comment",
+        issueTitle: "Comment target",
+      },
+      {
+        entityId: "comment_1",
+        entityType: "issue_comment",
+        actorId: "user_1",
+        actorType: "user",
+        companyId: "company-test",
+      },
+    );
+
+    expect(harness.ctx.issues.listComments).toHaveBeenCalledWith(
+      "iss_comment",
+      "company-test",
+    );
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text: 'New comment on "Comment target" by A user',
+      }),
+    );
+    const blocks = JSON.stringify(mockPostMessage.mock.calls[0][0].blocks);
+    expect(blocks).toContain("Fetched from stored comment");
+    expect(blocks).not.toContain("user_1");
+  });
+
   it("uses entityId for issue.comment.created when the entity is an issue", async () => {
     const harness = createTestHarness({
       manifest,

@@ -49,11 +49,23 @@ export async function resolveActorName(
   const actorName = getPayloadString(
     event,
     "actorName",
+    "actorDisplayName",
     "userName",
+    "userDisplayName",
+    "displayName",
     "name",
     "actor.name",
+    "actor.displayName",
     "user.name",
+    "user.displayName",
+    "author.name",
+    "author.displayName",
+    "comment.author.name",
+    "comment.author.displayName",
+    "data.author.name",
+    "data.author.displayName",
     "agent.name",
+    "agent.displayName",
   );
   if (actorName) return actorName;
 
@@ -75,7 +87,7 @@ export async function resolveActorName(
   }
 
   if (event.actorType === "user") {
-    return `User ${event.actorId}`;
+    return "A user";
   }
 
   if (event.actorType === "plugin") {

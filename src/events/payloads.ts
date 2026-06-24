@@ -23,6 +23,7 @@ export interface NormalizedIssue {
 }
 
 export interface NormalizedIssueComment {
+  commentId?: string;
   issueId: string;
   issueTitle: string;
   body: string;
@@ -225,6 +226,8 @@ export function parseIssueCommentCreated(
   return {
     ok: true,
     value: {
+      commentId:
+        event.entityType === "issue_comment" ? asString(event.entityId) : undefined,
       issueId,
       issueTitle:
         getPayloadString(

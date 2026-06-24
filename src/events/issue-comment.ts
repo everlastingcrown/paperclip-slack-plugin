@@ -30,6 +30,7 @@ export async function handleIssueCommentCreated(
     }
 
     const comment = parsed.value;
+    const body = await resolveCommentBody(ctx, companyId, comment);
     const author = await resolveActorName(ctx, event, companyId);
 
     const formatter = new SlackFormatter(config.paperclipUrl);
@@ -37,7 +38,7 @@ export async function handleIssueCommentCreated(
       issueId: comment.issueId,
       issueTitle: comment.issueTitle,
       author,
-      body: comment.body,
+      body,
     });
 
     const slack = new SlackClient(config.slackBotToken);
@@ -54,5 +55,30 @@ export async function handleIssueCommentCreated(
       error: e.message,
       eventId: event.eventId,
     });
+  }
+}
+
+async function resolveCommentBody(
+  ctx: PluginContext,
+  companyId: string,
+  comment: { commentId?: string; issueId: string; body: string },
+): Promise<string> {
+  if (comment.body.trim()) return comment.body;
+
+  try {
+    const comments = await ctx.issues.listComments(comment.issueId, companyId);
+    const matched = comment.commentId
+      ? comments.find((candidate) => candidate.id === comment.commentId)
+      : comments.at(-1);
+
+    return matched?.body ?? "";
+  } catch (e: any) {
+    ctx.logger.warn("Could not resolve issue comment body", {
+      issueId: comment.issueId,
+      commentId: comment.commentId,
+      companyId,
+      error: e.message,
+    });
+    return "";
   }
 }
