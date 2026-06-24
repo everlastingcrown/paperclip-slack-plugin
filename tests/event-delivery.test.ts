@@ -204,4 +204,195 @@ describe("worker event delivery", () => {
       }),
     );
   });
+
+  it("posts a Slack error notification when an enabled event has an invalid payload", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.comment.created": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.comment.created",
+      {
+        comment: {
+          body: "No issue reference",
+        },
+        target: {
+          id: "ambiguous_target",
+        },
+      },
+      {
+        entityId: "comment_1",
+        entityType: "issue_comment",
+        companyId: "company-test",
+      },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text: "Paperclip Slack plugin could not process issue.comment.created",
+      }),
+    );
+  });
+
+  it("posts issue lifecycle notifications", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.checked_out": { enabled: true, channels: ["#general"] },
+          "issue.released": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.checked_out",
+      { issue: { id: "iss_lifecycle", title: "Lifecycle target" } },
+      { entityId: "iss_lifecycle", entityType: "issue", companyId: "company-test" },
+    );
+    await harness.emit(
+      "issue.released",
+      { issue: { id: "iss_lifecycle", title: "Lifecycle target" } },
+      { entityId: "iss_lifecycle", entityType: "issue", companyId: "company-test" },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(2);
+    expect(mockPostMessage).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        channel: "C001",
+        text: "Issue checked out: Lifecycle target",
+      }),
+    );
+    expect(mockPostMessage).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        channel: "C001",
+        text: "Issue released: Lifecycle target",
+      }),
+    );
+  });
+
+  it("posts agent run status notifications", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "agent.run.finished": { enabled: true, channels: ["#general"] },
+          "agent.run.cancelled": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "agent.run.finished",
+      {
+        runId: "run_finished",
+        agent: { id: "agent_1", name: "BuilderBot" },
+      },
+      { entityId: "run_finished", entityType: "run", companyId: "company-test" },
+    );
+    await harness.emit(
+      "agent.run.cancelled",
+      {
+        runId: "run_cancelled",
+        agent: { id: "agent_1", name: "BuilderBot" },
+      },
+      { entityId: "run_cancelled", entityType: "run", companyId: "company-test" },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(2);
+    expect(mockPostMessage).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        channel: "C001",
+        text: "Agent run finished: BuilderBot",
+      }),
+    );
+    expect(mockPostMessage).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        channel: "C001",
+        text: "Agent run cancelled: BuilderBot",
+      }),
+    );
+  });
+
+  it("posts budget incident notifications", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "budget.incident.opened": { enabled: true, channels: ["#general"] },
+          "budget.incident.resolved": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "budget.incident.opened",
+      {
+        incident: {
+          id: "budget_1",
+          title: "Monthly spend exceeded",
+          severity: "high",
+        },
+      },
+      {
+        entityId: "budget_1",
+        entityType: "budget_incident",
+        companyId: "company-test",
+      },
+    );
+    await harness.emit(
+      "budget.incident.resolved",
+      {
+        incident: {
+          id: "budget_1",
+          title: "Monthly spend exceeded",
+          status: "resolved",
+        },
+      },
+      {
+        entityId: "budget_1",
+        entityType: "budget_incident",
+        companyId: "company-test",
+      },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(2);
+    expect(mockPostMessage).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        channel: "C001",
+        text: "Budget incident opened: Monthly spend exceeded",
+      }),
+    );
+    expect(mockPostMessage).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        channel: "C001",
+        text: "Budget incident resolved: Monthly spend exceeded",
+      }),
+    );
+  });
 });

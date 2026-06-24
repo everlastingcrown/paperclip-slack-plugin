@@ -7,9 +7,15 @@ const defaultConfig: PluginConfig = {
     "issue.created": { enabled: true, channels: ["#general"] },
     "issue.comment.created": { enabled: true, channels: ["#general"] },
     "issue.statusChanged": { enabled: true, channels: ["#general"] },
+    "issue.checked_out": { enabled: false, channels: ["#general"] },
+    "issue.released": { enabled: false, channels: ["#general"] },
     "approval.created": { enabled: true, channels: ["#general"] },
     "approval.decided": { enabled: true, channels: ["#general"] },
+    "agent.run.finished": { enabled: false, channels: ["#alerts"] },
+    "agent.run.cancelled": { enabled: true, channels: ["#alerts"] },
     "agent.run.failed": { enabled: true, channels: ["#alerts"] },
+    "budget.incident.opened": { enabled: true, channels: ["#alerts"] },
+    "budget.incident.resolved": { enabled: true, channels: ["#alerts"] },
   },
 };
 

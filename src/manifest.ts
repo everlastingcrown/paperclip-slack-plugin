@@ -6,7 +6,7 @@ const manifest: PaperclipPluginManifestV1 = {
   version: "0.0.0",
   displayName: "Slack Notifications",
   description:
-    "Sends Paperclip event notifications to configured Slack channels. Supports issue creation, comments, status changes, approvals, and agent errors.",
+    "Sends Paperclip event notifications to configured Slack channels. Supports issue creation, comments, lifecycle changes, approvals, agent runs, and budget incidents.",
   author: "everlastingcrown",
   categories: ["automation", "connector"],
   capabilities: [
@@ -98,6 +98,40 @@ const manifest: PaperclipPluginManifestV1 = {
               },
             },
           },
+          "issue.checked_out": {
+            type: "object",
+            title: "Issue Checked Out",
+            properties: {
+              enabled: {
+                type: "boolean",
+                title: "Enabled",
+                default: false,
+              },
+              channels: {
+                type: "array",
+                title: "Channels",
+                items: { type: "string" },
+                default: ["#general"],
+              },
+            },
+          },
+          "issue.released": {
+            type: "object",
+            title: "Issue Released",
+            properties: {
+              enabled: {
+                type: "boolean",
+                title: "Enabled",
+                default: false,
+              },
+              channels: {
+                type: "array",
+                title: "Channels",
+                items: { type: "string" },
+                default: ["#general"],
+              },
+            },
+          },
           "approval.created": {
             type: "object",
             title: "Approval Requested",
@@ -132,9 +166,79 @@ const manifest: PaperclipPluginManifestV1 = {
               },
             },
           },
+          "agent.run.finished": {
+            type: "object",
+            title: "Agent Run Finished",
+            description:
+              "Disabled by default because successful runs may be frequent.",
+            properties: {
+              enabled: {
+                type: "boolean",
+                title: "Enabled",
+                default: false,
+              },
+              channels: {
+                type: "array",
+                title: "Channels",
+                items: { type: "string" },
+                default: ["#alerts"],
+              },
+            },
+          },
+          "agent.run.cancelled": {
+            type: "object",
+            title: "Agent Run Cancelled",
+            properties: {
+              enabled: {
+                type: "boolean",
+                title: "Enabled",
+                default: true,
+              },
+              channels: {
+                type: "array",
+                title: "Channels",
+                items: { type: "string" },
+                default: ["#alerts"],
+              },
+            },
+          },
           "agent.run.failed": {
             type: "object",
             title: "Agent Run Failed",
+            properties: {
+              enabled: {
+                type: "boolean",
+                title: "Enabled",
+                default: true,
+              },
+              channels: {
+                type: "array",
+                title: "Channels",
+                items: { type: "string" },
+                default: ["#alerts"],
+              },
+            },
+          },
+          "budget.incident.opened": {
+            type: "object",
+            title: "Budget Incident Opened",
+            properties: {
+              enabled: {
+                type: "boolean",
+                title: "Enabled",
+                default: true,
+              },
+              channels: {
+                type: "array",
+                title: "Channels",
+                items: { type: "string" },
+                default: ["#alerts"],
+              },
+            },
+          },
+          "budget.incident.resolved": {
+            type: "object",
+            title: "Budget Incident Resolved",
             properties: {
               enabled: {
                 type: "boolean",
