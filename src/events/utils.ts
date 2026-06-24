@@ -46,9 +46,6 @@ export async function resolveActorName(
   event: PluginEvent,
   companyId: string,
 ): Promise<string> {
-  void ctx;
-  void companyId;
-
   const actorName = getPayloadString(
     event,
     "actorName",
@@ -63,6 +60,17 @@ export async function resolveActorName(
   if (!event.actorId) return "System";
 
   if (event.actorType === "agent") {
+    try {
+      const agent = await ctx.agents.get(event.actorId, companyId);
+      if (agent?.name) return agent.name;
+    } catch (e: any) {
+      ctx.logger.warn("Could not resolve agent actor name", {
+        actorId: event.actorId,
+        companyId,
+        error: e.message,
+      });
+    }
+
     return `Agent ${event.actorId}`;
   }
 

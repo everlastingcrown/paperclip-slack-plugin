@@ -132,6 +132,59 @@ describe("worker event delivery", () => {
         text: 'New comment on "Comment target" by Jane Smith',
       }),
     );
+    expect(JSON.stringify(mockPostMessage.mock.calls[0][0].blocks)).toContain(
+      "I can reproduce this",
+    );
+  });
+
+  it("posts issue comment text from data.body and resolves agent actor names", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.comment.created": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+    vi.spyOn(harness.ctx.agents, "get").mockResolvedValue({
+      name: "BuilderBot",
+    } as any);
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.comment.created",
+      {
+        data: {
+          issueId: "iss_comment",
+          body: "The fix is ready for review",
+        },
+        issueTitle: "Comment target",
+      },
+      {
+        entityId: "comment_1",
+        entityType: "issue_comment",
+        actorId: "agent_1",
+        actorType: "agent",
+        companyId: "company-test",
+      },
+    );
+
+    expect(harness.ctx.agents.get).toHaveBeenCalledWith(
+      "agent_1",
+      "company-test",
+    );
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text: 'New comment on "Comment target" by BuilderBot',
+      }),
+    );
+    expect(JSON.stringify(mockPostMessage.mock.calls[0][0].blocks)).toContain(
+      "The fix is ready for review",
+    );
   });
 
   it("uses entityId for issue.comment.created when the entity is an issue", async () => {
