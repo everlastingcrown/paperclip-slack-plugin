@@ -24,6 +24,13 @@ export interface StatusChangeInfo {
   changedBy: string;
 }
 
+export interface IssueLifecycleInfo {
+  issueId: string;
+  issueTitle: string;
+  actor: string;
+  event: "checked_out" | "released";
+}
+
 export interface ApprovalInfo {
   id: string;
   issueId?: string;
@@ -38,6 +45,29 @@ export interface AgentErrorInfo {
   agentName: string;
   error: string;
   runId?: string;
+}
+
+export interface AgentRunInfo {
+  agentId: string;
+  agentName: string;
+  runId: string;
+  status: "finished" | "cancelled";
+}
+
+export interface BudgetIncidentInfo {
+  id: string;
+  title: string;
+  state: "opened" | "resolved";
+  severity?: string;
+  status?: string;
+  amount?: string;
+  budget?: string;
+}
+
+export interface EventProcessingErrorInfo {
+  eventId: string;
+  eventType: string;
+  reason: string;
 }
 
 export class SlackFormatter {
@@ -72,6 +102,11 @@ export class SlackFormatter {
   private agentUrl(agentId: string): string | null {
     if (!this.paperclipUrl) return null;
     return `${this.paperclipUrl}/agents/${agentId}`;
+  }
+
+  private runUrl(runId: string): string | null {
+    if (!this.paperclipUrl || runId === "unknown-run") return null;
+    return `${this.paperclipUrl}/runs/${runId}`;
   }
 
   private linkedText(url: string | null, label: string): string {
@@ -238,6 +273,35 @@ export class SlackFormatter {
     return { text, blocks };
   }
 
+  issueLifecycle(info: IssueLifecycleInfo): { text: string; blocks: (Block | KnownBlock)[] } {
+    const label = info.event === "checked_out" ? "Issue checked out" : "Issue released";
+    const action = info.event === "checked_out" ? "checked out" : "released";
+    const text = `${label}: ${info.issueTitle}`;
+
+    const blocks: (Block | KnownBlock)[] = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: label,
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*${this.linkedText(this.issueUrl(info.issueId), info.issueTitle)}* was ${action} by *${info.actor}*`,
+        },
+      },
+    ];
+
+    const button = this.viewButton(this.issueUrl(info.issueId), "view-issue");
+    if (button) blocks.push(button);
+
+    return { text, blocks };
+  }
+
   approvalCreated(info: ApprovalInfo): { text: string; blocks: (Block | KnownBlock)[] } {
     const issueRef =
       info.issueId && info.issueTitle
@@ -390,5 +454,113 @@ export class SlackFormatter {
     if (button) blocks.push(button);
 
     return { text, blocks };
+  }
+
+  agentRunStatus(info: AgentRunInfo): { text: string; blocks: (Block | KnownBlock)[] } {
+    const label =
+      info.status === "finished" ? "Agent run finished" : "Agent run cancelled";
+    const text = `${label}: ${info.agentName}`;
+
+    const blocks: (Block | KnownBlock)[] = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: label,
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*Agent:* ${this.linkedText(
+            this.agentUrl(info.agentId),
+            info.agentName,
+          )}`,
+        },
+      },
+      {
+        type: "section",
+        fields: [{ type: "mrkdwn", text: `*Run ID:*\n\`${info.runId}\`` }],
+      },
+    ];
+
+    const button = this.viewButton(this.runUrl(info.runId), "view-run");
+    if (button) blocks.push(button);
+
+    return { text, blocks };
+  }
+
+  budgetIncident(info: BudgetIncidentInfo): { text: string; blocks: (Block | KnownBlock)[] } {
+    const label =
+      info.state === "opened" ? "Budget incident opened" : "Budget incident resolved";
+    const text = `${label}: ${info.title}`;
+    const fields: { type: "mrkdwn"; text: string }[] = [];
+
+    if (info.severity) {
+      fields.push({ type: "mrkdwn", text: `*Severity:*\n${info.severity}` });
+    }
+    if (info.status) {
+      fields.push({ type: "mrkdwn", text: `*Status:*\n${info.status}` });
+    }
+    if (info.amount) {
+      fields.push({ type: "mrkdwn", text: `*Amount:*\n${info.amount}` });
+    }
+    if (info.budget) {
+      fields.push({ type: "mrkdwn", text: `*Budget:*\n${info.budget}` });
+    }
+
+    const blocks: (Block | KnownBlock)[] = [
+      {
+        type: "header",
+        text: {
+          type: "plain_text",
+          text: label,
+          emoji: true,
+        },
+      },
+      {
+        type: "section",
+        text: { type: "mrkdwn", text: `*${info.title}*` },
+      },
+    ];
+
+    if (fields.length > 0) {
+      blocks.push({ type: "section", fields });
+    }
+
+    return { text, blocks };
+  }
+
+  eventProcessingError(info: EventProcessingErrorInfo): { text: string; blocks: (Block | KnownBlock)[] } {
+    const text = `Paperclip Slack plugin could not process ${info.eventType}`;
+    return {
+      text,
+      blocks: [
+        {
+          type: "header",
+          text: {
+            type: "plain_text",
+            text: "Slack notification error",
+            emoji: true,
+          },
+        },
+        {
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `Could not process *${info.eventType}* for Slack notification.`,
+          },
+        },
+        {
+          type: "section",
+          fields: [
+            { type: "mrkdwn", text: `*Event ID:*\n\`${info.eventId}\`` },
+            { type: "mrkdwn", text: `*Reason:*\n${info.reason}` },
+          ],
+        },
+      ],
+    };
   }
 }

@@ -88,6 +88,10 @@ describe("SlackFormatter", () => {
         type: "header",
         text: { text: expect.stringContaining("New comment") },
       });
+      expect(result.blocks[2]).toMatchObject({
+        type: "section",
+        text: { text: expect.stringContaining("I can reproduce this on iOS") },
+      });
     });
 
     it("should omit comment body block when body is empty", () => {
@@ -100,6 +104,24 @@ describe("SlackFormatter", () => {
 
       expect(result.blocks).toHaveLength(3);
       expect(result.blocks[2]).toMatchObject({ type: "actions" });
+    });
+  });
+
+  describe("issueLifecycle", () => {
+    it("should format issue lifecycle messages", () => {
+      const result = formatter.issueLifecycle({
+        issueId: "iss-001",
+        issueTitle: "Fix login crash",
+        actor: "Jane Smith",
+        event: "released",
+      });
+
+      expect(result.text).toBe("Issue released: Fix login crash");
+      expect(result.blocks).toHaveLength(3);
+      expect(result.blocks[1]).toMatchObject({
+        type: "section",
+        text: { text: expect.stringContaining("Jane Smith") },
+      });
     });
   });
 
@@ -201,6 +223,53 @@ describe("SlackFormatter", () => {
       });
 
       expect(result.blocks).toHaveLength(4);
+    });
+  });
+
+  describe("agentRunStatus", () => {
+    it("should format agent run finished messages", () => {
+      const result = formatter.agentRunStatus({
+        agentId: "agent-001",
+        agentName: "BuilderBot",
+        runId: "run-123",
+        status: "finished",
+      });
+
+      expect(result.text).toBe("Agent run finished: BuilderBot");
+      expect(result.blocks).toHaveLength(4);
+    });
+  });
+
+  describe("budgetIncident", () => {
+    it("should format budget incident messages", () => {
+      const result = formatter.budgetIncident({
+        id: "budget-001",
+        title: "Monthly spend exceeded",
+        state: "opened",
+        severity: "high",
+        amount: "$125.00",
+        budget: "Engineering",
+      });
+
+      expect(result.text).toBe("Budget incident opened: Monthly spend exceeded");
+      expect(result.blocks).toHaveLength(3);
+    });
+  });
+
+  describe("eventProcessingError", () => {
+    it("should format event processing errors without raw payloads", () => {
+      const result = formatter.eventProcessingError({
+        eventId: "evt-001",
+        eventType: "issue.comment.created",
+        reason: "Could not determine issue ID for comment.",
+      });
+
+      expect(result.text).toBe(
+        "Paperclip Slack plugin could not process issue.comment.created",
+      );
+      expect(result.blocks).toHaveLength(3);
+      expect(JSON.stringify(result.blocks)).toContain("evt-001");
+      expect(JSON.stringify(result.blocks)).not.toContain("payload");
     });
   });
 

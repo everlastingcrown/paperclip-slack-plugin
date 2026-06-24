@@ -2,7 +2,8 @@ import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 import { getConfig } from "../config.js";
 import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
-import { getIssueSnapshot } from "./utils.js";
+import { postToChannels, reportEventProcessingError } from "./delivery.js";
+import { parseIssueCreated } from "./payloads.js";
 
 export async function handleIssueCreated(
   ctx: PluginContext,
@@ -12,14 +13,19 @@ export async function handleIssueCreated(
   const eventCfg = config.events["issue.created"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 
-  const issue = getIssueSnapshot(event);
-  if (!issue) {
-    ctx.logger.warn("Could not determine issue ID for issue.created event", {
-      eventId: event.eventId,
-    });
+  const parsed = parseIssueCreated(event);
+  if (!parsed.ok) {
+    await reportEventProcessingError(
+      ctx,
+      event,
+      eventCfg.channels,
+      parsed.reason,
+      parsed.details,
+    );
     return;
   }
 
+  const issue = parsed.value;
   const issueId = issue.id;
 
   try {
@@ -36,33 +42,9 @@ export async function handleIssueCreated(
     });
 
     const slack = new SlackClient(config.slackBotToken);
-
-    for (const channel of eventCfg.channels) {
-      try {
-        const resolved = await slack.resolveChannel(channel);
-        if (!resolved) {
-          ctx.logger.warn("Channel not found for issue.created", {
-            channel,
-            issueId,
-          });
-          continue;
-        }
-        await slack.postMessage(resolved, message.text, message.blocks);
-        ctx.logger.info("Slack notification sent for issue.created", {
-          channel,
-          issueId,
-        });
-      } catch (e: any) {
-        ctx.logger.error(
-          "Failed to send Slack notification for issue.created",
-          {
-            channel,
-            error: e.message,
-            issueId,
-          },
-        );
-      }
-    }
+    await postToChannels(ctx, slack, eventCfg.channels, message, "issue.created", {
+      issueId,
+    });
   } catch (e: any) {
     ctx.logger.error("Error handling issue.created event", {
       error: e.message,

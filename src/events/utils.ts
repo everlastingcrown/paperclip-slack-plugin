@@ -2,16 +2,6 @@ import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 
 type UnknownRecord = Record<string, unknown>;
 
-export interface IssueSnapshot {
-  id: string;
-  title: string;
-  description?: string;
-  status?: string;
-  priority?: string;
-  projectId?: string;
-  projectName?: string;
-}
-
 export function isRecord(value: unknown): value is UnknownRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -49,50 +39,6 @@ export function getPayloadString(
   }
 
   return undefined;
-}
-
-export function getEventString(
-  event: PluginEvent,
-  ...payloadKeys: string[]
-): string | undefined {
-  if (event.entityId) return event.entityId;
-
-  return getPayloadString(event, ...payloadKeys);
-}
-
-function pickRecord(...values: unknown[]): UnknownRecord | undefined {
-  return values.find(isRecord);
-}
-
-export function getIssueSnapshot(event: PluginEvent): IssueSnapshot | undefined {
-  const payload = getPayloadRecord(event);
-  const issue = pickRecord(
-    payload?.issue,
-    nestedValue(payload, "data.issue"),
-    payload?.after,
-    payload?.current,
-    payload,
-  );
-
-  const id =
-    event.entityType === "issue" ? asString(event.entityId) : undefined;
-  const issueId =
-    id ??
-    getPayloadString(event, "issueId", "issue.id", "data.issue.id", "id");
-  if (!issueId) return undefined;
-
-  return {
-    id: issueId,
-    title: asString(issue?.title) ?? `Issue ${issueId}`,
-    description: asString(issue?.description),
-    status: asString(issue?.status),
-    priority: asString(issue?.priority),
-    projectId: asString(issue?.projectId),
-    projectName:
-      asString(nestedValue(issue, "project.name")) ??
-      asString(nestedValue(payload, "project.name")) ??
-      asString(payload?.projectName),
-  };
 }
 
 export async function resolveActorName(

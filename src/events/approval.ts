@@ -1,8 +1,11 @@
 import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
+import type { Block, KnownBlock } from "@slack/types";
 import { getConfig } from "../config.js";
 import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
-import { getPayloadString, resolveActorName } from "./utils.js";
+import { postToChannels, reportEventProcessingError } from "./delivery.js";
+import { parseApproval } from "./payloads.js";
+import { resolveActorName } from "./utils.js";
 
 export async function handleApprovalCreated(
   ctx: PluginContext,
@@ -32,96 +35,49 @@ async function handleApproval(
   kind: "created" | "decided",
   channels: string[],
 ): Promise<void> {
-  const approvalId = event.entityId;
+  const config = getConfig();
   const companyId = event.companyId;
-  if (!approvalId) return;
 
   try {
-    const issueId = getPayloadString(
-      event,
-      "issueId",
-      "issue.id",
-      "data.issue.id",
-      "approval.issueId",
-    );
+    const parsed = parseApproval(event, kind);
+    if (!parsed.ok) {
+      await reportEventProcessingError(ctx, event, channels, parsed.reason, parsed.details);
+      return;
+    }
 
-    const issueTitle =
-      getPayloadString(
-        event,
-        "issueTitle",
-        "issue.title",
-        "data.issue.title",
-        "approval.issue.title",
-      ) ?? issueId;
-
+    const approval = parsed.value;
     const approver = await resolveActorName(ctx, event, companyId);
-    const decision =
-      kind === "decided"
-        ? getPayloadString(event, "decision", "outcome", "approval.decision")
-        : undefined;
-    const comment = getPayloadString(
-      event,
-      "comment",
-      "reason",
-      "description",
-      "approval.comment",
-    );
 
-    const formatter = new SlackFormatter(getConfig().paperclipUrl);
-    let message: { text: string; blocks: any[] };
+    const formatter = new SlackFormatter(config.paperclipUrl);
+    let message: { text: string; blocks: (Block | KnownBlock)[] };
 
     if (kind === "created") {
       message = formatter.approvalCreated({
-        id: approvalId,
-        issueId,
-        issueTitle,
+        id: approval.id,
+        issueId: approval.issueId,
+        issueTitle: approval.issueTitle ?? approval.issueId,
         approver,
-        comment,
+        comment: approval.comment,
       });
     } else {
       message = formatter.approvalDecided({
-        id: approvalId,
-        issueId,
-        issueTitle,
+        id: approval.id,
+        issueId: approval.issueId,
+        issueTitle: approval.issueTitle ?? approval.issueId,
         approver,
-        decision,
-        comment,
+        decision: approval.decision,
+        comment: approval.comment,
       });
     }
 
-    const slack = new SlackClient(getConfig().slackBotToken);
-
-    for (const channel of channels) {
-      try {
-        const resolved = await slack.resolveChannel(channel);
-        if (!resolved) {
-          ctx.logger.warn(`Channel not found for approval.${kind}`, {
-            channel,
-            approvalId,
-          });
-          continue;
-        }
-        await slack.postMessage(resolved, message.text, message.blocks);
-        ctx.logger.info(`Slack notification sent for approval.${kind}`, {
-          channel,
-          approvalId,
-        });
-      } catch (e: any) {
-        ctx.logger.error(
-          `Failed to send Slack notification for approval.${kind}`,
-          {
-            channel,
-            error: e.message,
-            approvalId,
-          },
-        );
-      }
-    }
+    const slack = new SlackClient(config.slackBotToken);
+    await postToChannels(ctx, slack, channels, message, `approval.${kind}`, {
+      approvalId: approval.id,
+    });
   } catch (e: any) {
     ctx.logger.error(`Error handling approval.${kind} event`, {
       error: e.message,
       eventId: event.eventId,
-      approvalId,
     });
   }
 }

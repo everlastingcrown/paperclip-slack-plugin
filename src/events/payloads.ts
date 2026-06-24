@@ -1,0 +1,364 @@
+import type { PluginEvent } from "@paperclipai/plugin-sdk";
+import {
+  asString,
+  getPayloadRecord,
+  getPayloadString,
+  isRecord,
+} from "./utils.js";
+
+type UnknownRecord = Record<string, unknown>;
+
+export type ParseResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; reason: string; details?: Record<string, unknown> };
+
+export interface NormalizedIssue {
+  id: string;
+  title: string;
+  description?: string;
+  status?: string;
+  priority?: string;
+  projectId?: string;
+  projectName?: string;
+}
+
+export interface NormalizedIssueComment {
+  issueId: string;
+  issueTitle: string;
+  body: string;
+}
+
+export interface NormalizedApproval {
+  id: string;
+  issueId?: string;
+  issueTitle?: string;
+  decision?: string;
+  comment?: string;
+}
+
+export interface NormalizedAgentRun {
+  runId: string;
+  agentId: string;
+  agentName: string;
+  error?: string;
+}
+
+export interface NormalizedBudgetIncident {
+  id: string;
+  title: string;
+  severity?: string;
+  status?: string;
+  amount?: string;
+  budget?: string;
+}
+
+function nestedValue(source: unknown, path: string): unknown {
+  if (!isRecord(source)) return undefined;
+
+  let current: unknown = source;
+  for (const segment of path.split(".")) {
+    if (!isRecord(current)) return undefined;
+    current = current[segment];
+  }
+
+  return current;
+}
+
+function pickRecord(...values: unknown[]): UnknownRecord | undefined {
+  return values.find(isRecord);
+}
+
+function payloadKeys(event: PluginEvent): string[] {
+  const payload = getPayloadRecord(event);
+  return payload ? Object.keys(payload).sort() : [];
+}
+
+function parseFailure(
+  reason: string,
+  event: PluginEvent,
+  details: Record<string, unknown> = {},
+): ParseResult<never> {
+  return {
+    ok: false,
+    reason,
+    details: {
+      ...details,
+      payloadKeys: payloadKeys(event),
+    },
+  };
+}
+
+function issueRecord(event: PluginEvent): UnknownRecord | undefined {
+  const payload = getPayloadRecord(event);
+  return pickRecord(
+    payload?.issue,
+    nestedValue(payload, "data.issue"),
+    payload?.after,
+    payload?.current,
+  );
+}
+
+function issueIdFromEvent(event: PluginEvent): string | undefined {
+  return event.entityType === "issue" ? asString(event.entityId) : undefined;
+}
+
+function normalizeIssueFromRecord(
+  event: PluginEvent,
+): ParseResult<NormalizedIssue> {
+  const payload = getPayloadRecord(event);
+  const issue = issueRecord(event);
+  const issueId =
+    issueIdFromEvent(event) ??
+    asString(issue?.id) ??
+    getPayloadString(event, "issueId", "data.issueId");
+
+  if (!issueId) {
+    return parseFailure("Could not determine issue ID.", event, {
+      entityId: event.entityId,
+      entityType: event.entityType,
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      id: issueId,
+      title:
+        asString(issue?.title) ??
+        asString(payload?.title) ??
+        getPayloadString(event, "issueTitle", "data.issueTitle") ??
+        `Issue ${issueId}`,
+      description: asString(issue?.description),
+      status: asString(issue?.status),
+      priority: asString(issue?.priority),
+      projectId: asString(issue?.projectId),
+      projectName:
+        asString(nestedValue(issue, "project.name")) ??
+        asString(nestedValue(payload, "project.name")) ??
+        asString(payload?.projectName),
+    },
+  };
+}
+
+export function parseIssueCreated(
+  event: PluginEvent,
+): ParseResult<NormalizedIssue> {
+  return normalizeIssueFromRecord(event);
+}
+
+export function parseIssueLifecycle(
+  event: PluginEvent,
+): ParseResult<NormalizedIssue> {
+  return normalizeIssueFromRecord(event);
+}
+
+export function parseIssueStatusUpdate(
+  event: PluginEvent,
+): ParseResult<NormalizedIssue> {
+  const parsed = normalizeIssueFromRecord(event);
+  if (!parsed.ok) return parsed;
+
+  if (!parsed.value.status) {
+    return parseFailure("Could not determine issue status.", event, {
+      issueId: parsed.value.id,
+    });
+  }
+
+  return parsed;
+}
+
+export function parseIssueCommentCreated(
+  event: PluginEvent,
+): ParseResult<NormalizedIssueComment> {
+  const issueId =
+    issueIdFromEvent(event) ??
+    getPayloadString(
+      event,
+      "issueId",
+      "data.issueId",
+      "comment.issueId",
+      "data.comment.issueId",
+      "issueComment.issueId",
+      "parentIssue.id",
+    );
+
+  if (!issueId) {
+    return parseFailure("Could not determine issue ID for comment.", event, {
+      entityId: event.entityId,
+      entityType: event.entityType,
+    });
+  }
+
+  const body =
+    getPayloadString(
+      event,
+      "body",
+      "content",
+      "text",
+      "comment.body",
+      "comment.content",
+      "comment.text",
+      "comment.markdown",
+      "data.comment.body",
+      "data.comment.content",
+      "data.comment.text",
+      "data.comment.markdown",
+      "issueComment.body",
+      "issueComment.content",
+      "issueComment.text",
+      "issueComment.markdown",
+    ) ?? "";
+
+  return {
+    ok: true,
+    value: {
+      issueId,
+      issueTitle:
+        getPayloadString(
+          event,
+          "issueTitle",
+          "data.issueTitle",
+          "issue.title",
+          "data.issue.title",
+          "comment.issue.title",
+        ) ?? `Issue ${issueId}`,
+      body,
+    },
+  };
+}
+
+export function parseApproval(
+  event: PluginEvent,
+  kind: "created" | "decided",
+): ParseResult<NormalizedApproval> {
+  const approvalId = asString(event.entityId);
+  if (!approvalId) {
+    return parseFailure("Could not determine approval ID.", event, {
+      entityId: event.entityId,
+      entityType: event.entityType,
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      id: approvalId,
+      issueId: getPayloadString(
+        event,
+        "issueId",
+        "data.issueId",
+        "issue.id",
+        "data.issue.id",
+        "approval.issueId",
+      ),
+      issueTitle: getPayloadString(
+        event,
+        "issueTitle",
+        "data.issueTitle",
+        "issue.title",
+        "data.issue.title",
+        "approval.issue.title",
+      ),
+      decision:
+        kind === "decided"
+          ? getPayloadString(event, "decision", "outcome", "approval.decision")
+          : undefined,
+      comment: getPayloadString(
+        event,
+        "comment",
+        "reason",
+        "description",
+        "approval.comment",
+      ),
+    },
+  };
+}
+
+export function parseAgentRun(
+  event: PluginEvent,
+): ParseResult<NormalizedAgentRun> {
+  const runId =
+    event.entityType === "run" ? asString(event.entityId) : undefined;
+  const agentId =
+    getPayloadString(event, "agentId", "data.agentId", "agent.id", "data.agent.id") ??
+    (event.entityType === "agent" ? asString(event.entityId) : undefined);
+
+  if (!runId && !agentId) {
+    return parseFailure("Could not determine run or agent ID.", event, {
+      entityId: event.entityId,
+      entityType: event.entityType,
+    });
+  }
+
+  const resolvedAgentId = agentId ?? "unknown-agent";
+
+  return {
+    ok: true,
+    value: {
+      runId:
+        runId ??
+        getPayloadString(event, "runId", "data.runId", "run.id", "data.run.id") ??
+        "unknown-run",
+      agentId: resolvedAgentId,
+      agentName:
+        getPayloadString(event, "agentName", "agent.name", "data.agent.name") ??
+        `Agent ${resolvedAgentId}`,
+      error: getPayloadString(
+        event,
+        "error",
+        "message",
+        "reason",
+        "run.error",
+        "data.run.error",
+      ),
+    },
+  };
+}
+
+export function parseBudgetIncident(
+  event: PluginEvent,
+): ParseResult<NormalizedBudgetIncident> {
+  const payload = getPayloadRecord(event);
+  const incident = pickRecord(
+    payload?.incident,
+    payload?.budgetIncident,
+    nestedValue(payload, "data.incident"),
+    nestedValue(payload, "data.budgetIncident"),
+    payload,
+  );
+  const incidentId =
+    event.entityType === "budget_incident" ? asString(event.entityId) : undefined;
+  const id =
+    incidentId ??
+    asString(incident?.id) ??
+    getPayloadString(event, "incidentId", "budgetIncidentId", "data.incidentId");
+
+  if (!id) {
+    return parseFailure("Could not determine budget incident ID.", event, {
+      entityId: event.entityId,
+      entityType: event.entityType,
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      id,
+      title:
+        asString(incident?.title) ??
+        asString(incident?.name) ??
+        getPayloadString(event, "title", "name", "data.title") ??
+        `Budget incident ${id}`,
+      severity: asString(incident?.severity),
+      status: asString(incident?.status),
+      amount:
+        asString(incident?.amount) ??
+        asString(incident?.cost) ??
+        getPayloadString(event, "amount", "cost", "data.amount"),
+      budget:
+        asString(incident?.budget) ??
+        asString(nestedValue(incident, "budget.name")) ??
+        getPayloadString(event, "budgetName", "data.budgetName"),
+    },
+  };
+}

@@ -2,7 +2,8 @@ import type { PluginContext, PluginEvent } from "@paperclipai/plugin-sdk";
 import { getConfig } from "../config.js";
 import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
-import { getPayloadString } from "./utils.js";
+import { postToChannels, reportEventProcessingError } from "./delivery.js";
+import { parseAgentRun } from "./payloads.js";
 
 export async function handleAgentRunFailed(
   ctx: PluginContext,
@@ -13,57 +14,32 @@ export async function handleAgentRunFailed(
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 
   try {
-    const agentId =
-      getPayloadString(event, "agentId", "agent.id", "data.agent.id") ??
-      event.entityId;
-    const runId = getPayloadString(event, "runId", "run.id") ?? event.entityId;
+    const parsed = parseAgentRun(event);
+    if (!parsed.ok) {
+      await reportEventProcessingError(
+        ctx,
+        event,
+        eventCfg.channels,
+        parsed.reason,
+        parsed.details,
+      );
+      return;
+    }
 
-    if (!agentId) return;
-
-    const agentName =
-      getPayloadString(event, "agentName", "agent.name", "data.agent.name") ??
-      `Agent ${agentId}`;
-
-    const errorMessage =
-      getPayloadString(event, "error", "message", "reason", "run.error") ??
-      "Unknown error";
-
+    const run = parsed.value;
     const formatter = new SlackFormatter(config.paperclipUrl);
     const message = formatter.agentRunFailed({
-      agentId,
-      agentName,
-      error: errorMessage,
-      runId,
+      agentId: run.agentId,
+      agentName: run.agentName,
+      error: run.error ?? "Unknown error",
+      runId: run.runId,
     });
 
     const slack = new SlackClient(config.slackBotToken);
-
-    for (const channel of eventCfg.channels) {
-      try {
-        const resolved = await slack.resolveChannel(channel);
-        if (!resolved) {
-          ctx.logger.warn("Channel not found for agent.run.failed", {
-            channel,
-            agentId,
-          });
-          continue;
-        }
-        await slack.postMessage(resolved, message.text, message.blocks);
-        ctx.logger.info("Slack notification sent for agent.run.failed", {
-          channel,
-          agentId,
-        });
-      } catch (e: any) {
-        ctx.logger.error(
-          "Failed to send Slack notification for agent.run.failed",
-          {
-            channel,
-            error: e.message,
-            agentId,
-          },
-        );
-      }
-    }
+    await postToChannels(ctx, slack, eventCfg.channels, message, "agent.run.failed", {
+      agentId: run.agentId,
+      runId: run.runId,
+    });
   } catch (e: any) {
     ctx.logger.error("Error handling agent.run.failed event", {
       error: e.message,
