@@ -54,8 +54,12 @@ export async function resolveActorName(
     "userDisplayName",
     "displayName",
     "name",
+    "agentName",
+    "data.agentName",
     "actor.name",
     "actor.displayName",
+    "data.actor.name",
+    "data.actor.displayName",
     "user.name",
     "user.displayName",
     "author.name",
@@ -66,24 +70,19 @@ export async function resolveActorName(
     "data.author.displayName",
     "agent.name",
     "agent.displayName",
+    "data.agent.name",
+    "data.agent.displayName",
+    "run.agent.name",
+    "run.agent.displayName",
+    "data.run.agent.name",
+    "data.run.agent.displayName",
   );
   if (actorName) return actorName;
 
   if (!event.actorId) return "System";
 
   if (event.actorType === "agent") {
-    try {
-      const agent = await ctx.agents.get(event.actorId, companyId);
-      if (agent?.name) return agent.name;
-    } catch (e: any) {
-      ctx.logger.warn("Could not resolve agent actor name", {
-        actorId: event.actorId,
-        companyId,
-        error: e.message,
-      });
-    }
-
-    return `Agent ${event.actorId}`;
+    return resolveAgentName(ctx, event, companyId, event.actorId);
   }
 
   if (event.actorType === "user") {
@@ -95,4 +94,42 @@ export async function resolveActorName(
   }
 
   return event.actorId;
+}
+
+export async function resolveAgentName(
+  ctx: PluginContext,
+  event: PluginEvent,
+  companyId: string,
+  agentId: string,
+  fallbackName = `Agent ${agentId}`,
+): Promise<string> {
+  const payloadName = getPayloadString(
+    event,
+    "agentName",
+    "data.agentName",
+    "agent.name",
+    "agent.displayName",
+    "data.agent.name",
+    "data.agent.displayName",
+    "run.agent.name",
+    "run.agent.displayName",
+    "data.run.agent.name",
+    "data.run.agent.displayName",
+  );
+  if (payloadName) return payloadName;
+
+  if (fallbackName !== `Agent ${agentId}`) return fallbackName;
+
+  try {
+    const agent = await ctx.agents.get(agentId, companyId);
+    if (agent?.name) return agent.name;
+  } catch (e: any) {
+    ctx.logger.warn("Could not resolve agent name", {
+      agentId,
+      companyId,
+      error: e.message,
+    });
+  }
+
+  return fallbackName;
 }

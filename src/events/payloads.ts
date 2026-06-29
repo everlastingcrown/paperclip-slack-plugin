@@ -301,7 +301,17 @@ export function parseAgentRun(
   const runId =
     event.entityType === "run" ? asString(event.entityId) : undefined;
   const agentId =
-    getPayloadString(event, "agentId", "data.agentId", "agent.id", "data.agent.id") ??
+    getPayloadString(
+      event,
+      "agentId",
+      "data.agentId",
+      "agent.id",
+      "data.agent.id",
+      "run.agentId",
+      "data.run.agentId",
+      "run.agent.id",
+      "data.run.agent.id",
+    ) ??
     (event.entityType === "agent" ? asString(event.entityId) : undefined);
 
   if (!runId && !agentId) {
@@ -322,7 +332,19 @@ export function parseAgentRun(
         "unknown-run",
       agentId: resolvedAgentId,
       agentName:
-        getPayloadString(event, "agentName", "agent.name", "data.agent.name") ??
+        getPayloadString(
+          event,
+          "agentName",
+          "data.agentName",
+          "agent.name",
+          "agent.displayName",
+          "data.agent.name",
+          "data.agent.displayName",
+          "run.agent.name",
+          "run.agent.displayName",
+          "data.run.agent.name",
+          "data.run.agent.displayName",
+        ) ??
         `Agent ${resolvedAgentId}`,
       error: getPayloadString(
         event,

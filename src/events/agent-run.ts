@@ -4,6 +4,7 @@ import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
 import { postToChannels, reportEventProcessingError } from "./delivery.js";
 import { parseAgentRun } from "./payloads.js";
+import { resolveAgentName } from "./utils.js";
 
 export async function handleAgentRunFinished(
   ctx: PluginContext,
@@ -43,10 +44,17 @@ async function handleAgentRunStatus(
     }
 
     const run = parsed.value;
+    const agentName = await resolveAgentName(
+      ctx,
+      event,
+      event.companyId,
+      run.agentId,
+      run.agentName,
+    );
     const formatter = new SlackFormatter(config.paperclipUrl);
     const message = formatter.agentRunStatus({
       agentId: run.agentId,
-      agentName: run.agentName,
+      agentName,
       runId: run.runId,
       status,
     });

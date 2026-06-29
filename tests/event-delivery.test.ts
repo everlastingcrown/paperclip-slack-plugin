@@ -478,6 +478,45 @@ describe("worker event delivery", () => {
     );
   });
 
+  it("uses top-level agent names for agent run notifications", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "agent.run.finished": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "agent.run.finished",
+      {
+        agentId: "cc240c02-5eb2-4f5f-8fef-905e676141b8",
+        agentName: "BuilderBot",
+        runId: "8d55438f-6203-4b2f-8bb9-cd02c68afeab",
+      },
+      {
+        entityId: "8d55438f-6203-4b2f-8bb9-cd02c68afeab",
+        entityType: "run",
+        companyId: "company-test",
+      },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text: "Agent run finished: BuilderBot",
+      }),
+    );
+    expect(JSON.stringify(mockPostMessage.mock.calls[0][0].blocks)).not.toContain(
+      "Agent cc240c02-5eb2-4f5f-8fef-905e676141b8",
+    );
+  });
+
   it("posts budget incident notifications", async () => {
     const harness = createTestHarness({
       manifest,
