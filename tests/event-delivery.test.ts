@@ -93,6 +93,43 @@ describe("worker event delivery", () => {
     );
   });
 
+  it("posts issue.created from Paperclip plugin-host activity details", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.created": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.created",
+      {
+        title: "Fix release notes",
+        identifier: "ENG-42",
+        originKind: "plugin:test",
+        originId: "origin_1",
+        billingCode: "engineering",
+        blockedByIssueIds: [],
+        agentId: null,
+        runId: null,
+      },
+      { entityId: "iss_42", entityType: "issue", companyId: "company-test" },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text: "New issue created: Fix release notes",
+      }),
+    );
+  });
+
   it("uses nested issue IDs for issue.comment.created payloads", async () => {
     const harness = createTestHarness({
       manifest,
@@ -236,6 +273,51 @@ describe("worker event delivery", () => {
     const blocks = JSON.stringify(mockPostMessage.mock.calls[0][0].blocks);
     expect(blocks).toContain("The failing version was removed from the registry.");
     expect(blocks).not.toContain("cc240c02-5eb2-4f5f-8fef-905e676141b8");
+  });
+
+  it("posts issue comments from Paperclip plugin-host activity details", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.comment.created": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+    const listComments = vi.spyOn(harness.ctx.issues, "listComments");
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.comment.created",
+      {
+        identifier: "CI failed, version no longer exists",
+        commentId: "comment_1",
+        bodySnippet: "The failing version was removed from the registry.",
+        actorName: "BuilderBot",
+        agentId: "agent_1",
+        runId: null,
+      },
+      {
+        entityId: "iss_comment",
+        entityType: "issue",
+        companyId: "company-test",
+      },
+    );
+
+    expect(listComments).not.toHaveBeenCalled();
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text:
+          'New comment on "CI failed, version no longer exists" by BuilderBot',
+      }),
+    );
+    expect(JSON.stringify(mockPostMessage.mock.calls[0][0].blocks)).toContain(
+      "The failing version was removed from the registry.",
+    );
   });
 
   it("still posts issue comments when fallback SDK reads fail", async () => {
@@ -424,6 +506,50 @@ describe("worker event delivery", () => {
         identifier: "CI failed, version no longer exists",
         runId: "run_1",
         status: "in_progress",
+      },
+      {
+        entityId: "iss_status",
+        entityType: "issue",
+        actorName: "BuilderBot",
+        companyId: "company-test",
+      },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text:
+          'Issue "CI failed, version no longer exists" status changed: open → in_progress',
+      }),
+    );
+  });
+
+  it("detects issue status changes from Paperclip plugin-host patch payloads", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.statusChanged": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.updated",
+      {
+        identifier: "CI failed, version no longer exists",
+        patch: { status: "in_progress" },
+        _previous: {
+          status: "open",
+          assigneeAgentId: null,
+          assigneeUserId: null,
+        },
+        agentId: "agent_1",
+        runId: "run_1",
       },
       {
         entityId: "iss_status",

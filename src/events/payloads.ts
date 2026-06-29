@@ -8,6 +8,45 @@ import {
 
 type UnknownRecord = Record<string, unknown>;
 
+interface PaperclipPluginActivityPayload extends UnknownRecord {
+  sourcePluginId?: unknown;
+  sourcePluginKey?: unknown;
+  initiatingActorType?: unknown;
+  initiatingActorId?: unknown;
+  initiatingAgentId?: unknown;
+  initiatingUserId?: unknown;
+  initiatingRunId?: unknown;
+  pluginId?: unknown;
+  pluginKey?: unknown;
+  agentId?: unknown;
+  runId?: unknown;
+}
+
+interface PaperclipIssueCreatedPayload extends PaperclipPluginActivityPayload {
+  title?: unknown;
+  identifier?: unknown;
+  originKind?: unknown;
+  originId?: unknown;
+  billingCode?: unknown;
+  blockedByIssueIds?: unknown;
+}
+
+interface PaperclipIssueUpdatedPayload extends PaperclipPluginActivityPayload {
+  identifier?: unknown;
+  patch?: UnknownRecord;
+  _previous?: {
+    status?: unknown;
+    assigneeAgentId?: unknown;
+    assigneeUserId?: unknown;
+  };
+}
+
+interface PaperclipIssueCommentCreatedPayload extends PaperclipPluginActivityPayload {
+  identifier?: unknown;
+  commentId?: unknown;
+  bodySnippet?: unknown;
+}
+
 export type ParseResult<T> =
   | { ok: true; value: T }
   | { ok: false; reason: string; details?: Record<string, unknown> };
@@ -100,6 +139,24 @@ function issueRecord(event: PluginEvent): UnknownRecord | undefined {
   );
 }
 
+function paperclipIssueCreatedPayload(
+  event: PluginEvent,
+): PaperclipIssueCreatedPayload | undefined {
+  return getPayloadRecord(event) as PaperclipIssueCreatedPayload | undefined;
+}
+
+function paperclipIssueUpdatedPayload(
+  event: PluginEvent,
+): PaperclipIssueUpdatedPayload | undefined {
+  return getPayloadRecord(event) as PaperclipIssueUpdatedPayload | undefined;
+}
+
+function paperclipIssueCommentCreatedPayload(
+  event: PluginEvent,
+): PaperclipIssueCommentCreatedPayload | undefined {
+  return getPayloadRecord(event) as PaperclipIssueCommentCreatedPayload | undefined;
+}
+
 function issueIdFromEvent(event: PluginEvent): string | undefined {
   return event.entityType === "issue" ? asString(event.entityId) : undefined;
 }
@@ -108,6 +165,8 @@ function normalizeIssueFromRecord(
   event: PluginEvent,
 ): ParseResult<NormalizedIssue> {
   const payload = getPayloadRecord(event);
+  const createdPayload = paperclipIssueCreatedPayload(event);
+  const updatedPayload = paperclipIssueUpdatedPayload(event);
   const issue = issueRecord(event);
   const issueId =
     issueIdFromEvent(event) ??
@@ -128,11 +187,14 @@ function normalizeIssueFromRecord(
       title:
         asString(issue?.title) ??
         asString(payload?.title) ??
-        getPayloadString(event, "issueTitle", "data.issueTitle", "identifier") ??
+        asString(createdPayload?.identifier) ??
+        asString(updatedPayload?.identifier) ??
+        getPayloadString(event, "issueTitle", "data.issueTitle") ??
         `Issue ${issueId}`,
       description: asString(issue?.description),
       status:
         asString(issue?.status) ??
+        asString(updatedPayload?.patch?.status) ??
         getPayloadString(event, "status", "data.status"),
       previousStatus: getPayloadString(
         event,
@@ -176,6 +238,7 @@ export function parseIssueStatusUpdate(
 export function parseIssueCommentCreated(
   event: PluginEvent,
 ): ParseResult<NormalizedIssueComment> {
+  const paperclipPayload = paperclipIssueCommentCreatedPayload(event);
   const issueId =
     issueIdFromEvent(event) ??
     getPayloadString(
@@ -202,6 +265,7 @@ export function parseIssueCommentCreated(
     getPayloadString(
       event,
       "body",
+      "bodySnippet",
       "content",
       "text",
       "markdown",
@@ -234,9 +298,11 @@ export function parseIssueCommentCreated(
     ok: true,
     value: {
       commentId:
-        event.entityType === "issue_comment" ? asString(event.entityId) : undefined,
+        asString(paperclipPayload?.commentId) ??
+        (event.entityType === "issue_comment" ? asString(event.entityId) : undefined),
       issueId,
       issueTitle:
+        asString(paperclipPayload?.identifier) ??
         getPayloadString(
           event,
           "issueTitle",

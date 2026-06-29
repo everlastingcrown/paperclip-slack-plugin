@@ -56,9 +56,15 @@ Each event type has its own configuration:
 | Issue Created | `#general` | When a new issue is created |
 | Issue Comment Created | `#general` | When a comment is added to an issue |
 | Issue Status Changed | `#general` | When an issue's status field changes |
+| Issue Checked Out | `#general` | When an issue is checked out; disabled by default |
+| Issue Released | `#general` | When an issue is released; disabled by default |
 | Approval Requested | `#general` | When an approval is created |
 | Approval Decided | `#general` | When an approval is approved or rejected |
+| Agent Run Finished | `#alerts` | When an agent run finishes; disabled by default |
+| Agent Run Cancelled | `#alerts` | When an agent run is cancelled |
 | Agent Run Failed | `#alerts` | When an agent run fails with an error |
+| Budget Incident Opened | `#alerts` | When a budget threshold incident opens |
+| Budget Incident Resolved | `#alerts` | When a budget incident resolves |
 
 ### Channel Names, IDs, and Private Channels
 
@@ -138,6 +144,16 @@ pnpm install
 pnpm run build
 pnpm run test
 ```
+
+### Event Payloads
+
+Paperclip plugin events are emitted from the Paperclip server activity log. To verify payload shapes, inspect the Paperclip source in this order:
+
+1. `server/src/services/activity-log.ts` maps activity actions to plugin event names and builds `PluginEvent.payload` from activity `details` plus `agentId` and `runId`.
+2. `server/src/services/plugin-host-services.ts` shows the `details` objects for plugin-originated issue activity.
+3. Search the Paperclip repo for `logActivity(` and the event or action name to find other emitters.
+
+For issue events, plugin-originated payloads are currently flat activity details. Examples include `issue.created` with `title`, `identifier`, `originKind`, `originId`, `billingCode`, and `blockedByIssueIds`; `issue.updated` with `identifier`, `patch`, and `_previous`; and `issue.comment.created` with `identifier`, `commentId`, and `bodySnippet`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for details on project structure, adding new event types, and the release process.
 

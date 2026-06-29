@@ -39,3 +39,14 @@ Always `build:types` after changing signatures — esbuild won't catch type erro
 
 - `tests/slack-client.test.ts` mocks `@slack/web-api` at module scope using `vi.mock`. Mock factories reference module-scoped `vi.fn()` variables (hoisted by vitest). Don't nest mock setup inside `describe` blocks.
 - `tests/formatter.test.ts` validates Block Kit structure. Expect exact block counts per event variant. The `actions` block with "View in Paperclip" button is always the last block.
+
+## Finding event payloads
+
+- Start in Paperclip server `server/src/services/activity-log.ts`. `publishPluginDomainEvent()` is where the `PluginEvent` is assembled; payload is `{ ...details, agentId, runId }`.
+- Check `ACTIVITY_ACTION_TO_PLUGIN_EVENT` in that file for activity action aliases such as `issue_comment_created` → `issue.comment.created` and budget/approval remaps.
+- For plugin-originated issue payloads, inspect `server/src/services/plugin-host-services.ts` and search for `logPluginActivity({` or the action string. Important issue shapes there:
+  - `issue.created`: `title`, `identifier`, `originKind`, `originId`, `billingCode`, `blockedByIssueIds`
+  - `issue.updated`: `identifier`, `patch`, `_previous.status`, `_previous.assigneeAgentId`, `_previous.assigneeUserId`
+  - `issue.comment.created`: `identifier`, `commentId`, `bodySnippet`
+  - `issue.relations.updated`: `identifier`, `mutation`, `blockedByIssueIds`, `previousBlockedByIssueIds`
+- For non-plugin-originated events, search the Paperclip repo for `logActivity(` and the plugin event name or activity action. Add focused tests using the real emitted `details` object before changing parser fallbacks.
