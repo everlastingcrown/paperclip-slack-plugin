@@ -187,6 +187,100 @@ describe("worker event delivery", () => {
     );
   });
 
+  it("posts issue comment text from top-level comment payloads", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.comment.created": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+    const listComments = vi
+      .spyOn(harness.ctx.issues, "listComments")
+      .mockRejectedValue(new Error("missing invocation scope"));
+    const agentsGet = vi
+      .spyOn(harness.ctx.agents, "get")
+      .mockRejectedValue(new Error("missing invocation scope"));
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.comment.created",
+      {
+        issueId: "iss_comment",
+        issueTitle: "CI failed, version no longer exists",
+        comment: "The failing version was removed from the registry.",
+        agentName: "BuilderBot",
+      },
+      {
+        entityId: "comment_1",
+        entityType: "issue_comment",
+        actorId: "cc240c02-5eb2-4f5f-8fef-905e676141b8",
+        actorType: "agent",
+        companyId: "company-test",
+      },
+    );
+
+    expect(listComments).not.toHaveBeenCalled();
+    expect(agentsGet).not.toHaveBeenCalled();
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text:
+          'New comment on "CI failed, version no longer exists" by BuilderBot',
+      }),
+    );
+    const blocks = JSON.stringify(mockPostMessage.mock.calls[0][0].blocks);
+    expect(blocks).toContain("The failing version was removed from the registry.");
+    expect(blocks).not.toContain("cc240c02-5eb2-4f5f-8fef-905e676141b8");
+  });
+
+  it("still posts issue comments when fallback SDK reads fail", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.comment.created": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+    vi.spyOn(harness.ctx.issues, "listComments").mockRejectedValue(
+      new Error("missing invocation scope"),
+    );
+    vi.spyOn(harness.ctx.agents, "get").mockRejectedValue(
+      new Error("missing invocation scope"),
+    );
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.comment.created",
+      {
+        issueId: "iss_comment",
+        issueTitle: "Comment target",
+      },
+      {
+        entityId: "comment_1",
+        entityType: "issue_comment",
+        actorId: "agent_1",
+        actorType: "agent",
+        companyId: "company-test",
+      },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text: 'New comment on "Comment target" by Agent agent_1',
+      }),
+    );
+  });
+
   it("fetches comment body when the issue.comment.created payload only has IDs", async () => {
     const harness = createTestHarness({
       manifest,

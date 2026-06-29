@@ -4,7 +4,7 @@ import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
 import { postToChannels, reportEventProcessingError } from "./delivery.js";
 import { parseIssueCommentCreated } from "./payloads.js";
-import { resolveActorName } from "./utils.js";
+import { getPayloadRecord, resolveActorName } from "./utils.js";
 
 export async function handleIssueCommentCreated(
   ctx: PluginContext,
@@ -30,7 +30,7 @@ export async function handleIssueCommentCreated(
     }
 
     const comment = parsed.value;
-    const body = await resolveCommentBody(ctx, companyId, comment);
+    const body = await resolveCommentBody(ctx, event, companyId, comment);
     const author = await resolveActorName(ctx, event, companyId);
 
     const formatter = new SlackFormatter(config.paperclipUrl);
@@ -60,6 +60,7 @@ export async function handleIssueCommentCreated(
 
 async function resolveCommentBody(
   ctx: PluginContext,
+  event: PluginEvent,
   companyId: string,
   comment: { commentId?: string; issueId: string; body: string },
 ): Promise<string> {
@@ -73,10 +74,12 @@ async function resolveCommentBody(
 
     return matched?.body ?? "";
   } catch (e: any) {
+    const payload = getPayloadRecord(event);
     ctx.logger.warn("Could not resolve issue comment body", {
       issueId: comment.issueId,
       commentId: comment.commentId,
       companyId,
+      payloadKeys: payload ? Object.keys(payload).sort() : [],
       error: e.message,
     });
     return "";
