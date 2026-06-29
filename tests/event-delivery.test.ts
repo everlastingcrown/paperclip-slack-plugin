@@ -309,6 +309,46 @@ describe("worker event delivery", () => {
     );
   });
 
+  it("detects issue status changes from top-level issue.updated payloads", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        paperclipUrl: "https://paperclip.example",
+        events: {
+          "issue.statusChanged": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+
+    await plugin.definition.setup(harness.ctx);
+    await harness.emit(
+      "issue.updated",
+      {
+        _previous: { status: "open" },
+        agentId: "agent_1",
+        identifier: "CI failed, version no longer exists",
+        runId: "run_1",
+        status: "in_progress",
+      },
+      {
+        entityId: "iss_status",
+        entityType: "issue",
+        actorName: "BuilderBot",
+        companyId: "company-test",
+      },
+    );
+
+    expect(mockPostMessage).toHaveBeenCalledTimes(1);
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        channel: "C001",
+        text:
+          'Issue "CI failed, version no longer exists" status changed: open → in_progress',
+      }),
+    );
+  });
+
   it("posts a Slack error notification when an enabled event has an invalid payload", async () => {
     const harness = createTestHarness({
       manifest,

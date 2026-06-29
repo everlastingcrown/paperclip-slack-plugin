@@ -4,7 +4,7 @@ import { SlackClient } from "../slack/client.js";
 import { SlackFormatter } from "../slack/formatter.js";
 import { postToChannels, reportEventProcessingError } from "./delivery.js";
 import { parseIssueStatusUpdate } from "./payloads.js";
-import { resolveActorName } from "./utils.js";
+import { getPayloadRecord, resolveActorName } from "./utils.js";
 
 export async function handleIssueUpdated(
   ctx: PluginContext,
@@ -32,7 +32,15 @@ export async function handleIssueUpdated(
 
   try {
     const newStatus = issue.status;
-    if (!newStatus) return;
+    if (!newStatus) {
+      const payload = getPayloadRecord(event);
+      ctx.logger.info("Skipping issue.updated without status for Slack notification", {
+        eventId: event.eventId,
+        issueId,
+        payloadKeys: payload ? Object.keys(payload).sort() : [],
+      });
+      return;
+    }
 
     const stateKey = "last-status";
     const prevStatus = await ctx.state.get({
@@ -46,11 +54,15 @@ export async function handleIssueUpdated(
       newStatus,
     );
 
-    if (prevStatus === null || prevStatus === undefined) {
+    const oldStatus =
+      issue.previousStatus ??
+      (prevStatus === null || prevStatus === undefined
+        ? undefined
+        : String(prevStatus));
+
+    if (!oldStatus) {
       return;
     }
-
-    const oldStatus = String(prevStatus);
 
     if (oldStatus === newStatus) {
       return;

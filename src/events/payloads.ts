@@ -17,6 +17,7 @@ export interface NormalizedIssue {
   title: string;
   description?: string;
   status?: string;
+  previousStatus?: string;
   priority?: string;
   projectId?: string;
   projectName?: string;
@@ -127,12 +128,25 @@ function normalizeIssueFromRecord(
       title:
         asString(issue?.title) ??
         asString(payload?.title) ??
-        getPayloadString(event, "issueTitle", "data.issueTitle") ??
+        getPayloadString(event, "issueTitle", "data.issueTitle", "identifier") ??
         `Issue ${issueId}`,
       description: asString(issue?.description),
-      status: asString(issue?.status),
-      priority: asString(issue?.priority),
-      projectId: asString(issue?.projectId),
+      status:
+        asString(issue?.status) ??
+        getPayloadString(event, "status", "data.status"),
+      previousStatus: getPayloadString(
+        event,
+        "_previous.status",
+        "data._previous.status",
+        "before.status",
+        "previous.status",
+      ),
+      priority:
+        asString(issue?.priority) ??
+        getPayloadString(event, "priority", "data.priority"),
+      projectId:
+        asString(issue?.projectId) ??
+        getPayloadString(event, "projectId", "data.projectId"),
       projectName:
         asString(nestedValue(issue, "project.name")) ??
         asString(nestedValue(payload, "project.name")) ??
@@ -156,16 +170,7 @@ export function parseIssueLifecycle(
 export function parseIssueStatusUpdate(
   event: PluginEvent,
 ): ParseResult<NormalizedIssue> {
-  const parsed = normalizeIssueFromRecord(event);
-  if (!parsed.ok) return parsed;
-
-  if (!parsed.value.status) {
-    return parseFailure("Could not determine issue status.", event, {
-      issueId: parsed.value.id,
-    });
-  }
-
-  return parsed;
+  return normalizeIssueFromRecord(event);
 }
 
 export function parseIssueCommentCreated(
