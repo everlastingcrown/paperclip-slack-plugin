@@ -25,7 +25,7 @@ async function handleBudgetIncident(
   eventKey: "budget.incident.opened" | "budget.incident.resolved",
   state: "opened" | "resolved",
 ): Promise<void> {
-  const config = await getConfig(ctx, event.companyId);
+  const config = getConfig();
   const eventCfg = config.events[eventKey];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 

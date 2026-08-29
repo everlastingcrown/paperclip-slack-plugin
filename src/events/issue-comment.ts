@@ -10,7 +10,7 @@ export async function handleIssueCommentCreated(
   ctx: PluginContext,
   event: PluginEvent,
 ): Promise<void> {
-  const config = await getConfig(ctx, event.companyId);
+  const config = getConfig();
   const eventCfg = config.events["issue.comment.created"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 

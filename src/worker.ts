@@ -170,7 +170,7 @@ async function validateFullConfig(
 
 const plugin = definePlugin({
   async setup(ctx: PluginContext): Promise<void> {
-    initializeConfigCache(ctx);
+    await initializeConfigCache(ctx);
     registerAllHandlers(ctx);
 
     ctx.logger.info("Paperclip Slack plugin started");
@@ -196,14 +196,13 @@ const plugin = definePlugin({
 
   async onConfigChanged(
     newConfig: Record<string, unknown>,
-    context,
   ): Promise<void> {
     setConfig({
       slackBotToken: (newConfig.slackBotToken as string) ?? "",
       paperclipUrl:
         (newConfig.paperclipUrl as string) || "http://localhost:3100",
       events: newConfig.events as PluginConfig["events"] | undefined,
-    }, context?.companyId);
+    });
   },
 
   async onHealth(): Promise<PluginHealthDiagnostics> {

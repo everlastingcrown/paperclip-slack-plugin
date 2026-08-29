@@ -20,7 +20,6 @@ const defaultConfig: PluginConfig = {
   },
 };
 
-const configsByContext = new Map<PluginContext, Map<string, PluginConfig>>();
 let latestConfig: PluginConfig = { ...defaultConfig };
 
 function resolveConfig(partial: Partial<PluginConfig>): PluginConfig {
@@ -46,26 +45,21 @@ function resolveConfig(partial: Partial<PluginConfig>): PluginConfig {
   return config;
 }
 
-export async function getConfig(
-  ctx: PluginContext,
-  companyId: string,
-): Promise<PluginConfig> {
-  const configsByCompany = configsByContext.get(ctx) ?? new Map();
-  configsByContext.set(ctx, configsByCompany);
-
-  const cached = configsByCompany.get(companyId);
-  if (cached) return cached;
-
-  const config = resolveConfig(
-    (await ctx.config.get(companyId)) as Partial<PluginConfig>,
-  );
-  configsByCompany.set(companyId, config);
-  latestConfig = config;
-  return config;
+/**
+ * Returns the configuration most recently delivered by `onConfigChanged`.
+ *
+ * Event callbacks must not call `ctx.config.get()`: that host RPC is only
+ * authorized for the invocation which created it, and is unavailable after an
+ * event delivery has completed. This plugin is single-tenant, so a
+ * worker-global cache is the correct configuration source for event handlers.
+ */
+export function getConfig(): PluginConfig {
+  return latestConfig;
 }
 
-export function initializeConfigCache(ctx: PluginContext): void {
-  configsByContext.set(ctx, new Map());
+/** Load the initial config while setup has an authorized host invocation. */
+export async function initializeConfigCache(ctx: PluginContext): Promise<void> {
+  setConfig((await ctx.config.get()) as Partial<PluginConfig>);
 }
 
 export function getLatestConfig(): PluginConfig {
@@ -74,20 +68,8 @@ export function getLatestConfig(): PluginConfig {
 
 export function setConfig(
   partial: Partial<PluginConfig>,
-  companyId?: string | null,
 ): PluginConfig {
   const config = resolveConfig(partial);
   latestConfig = config;
-
-  if (companyId) {
-    for (const configsByCompany of configsByContext.values()) {
-      configsByCompany.set(companyId, config);
-    }
-  } else {
-    for (const configsByCompany of configsByContext.values()) {
-      configsByCompany.clear();
-    }
-  }
-
   return config;
 }

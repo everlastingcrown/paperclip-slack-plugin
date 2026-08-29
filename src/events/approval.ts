@@ -11,7 +11,7 @@ export async function handleApprovalCreated(
   ctx: PluginContext,
   event: PluginEvent,
 ): Promise<void> {
-  const config = await getConfig(ctx, event.companyId);
+  const config = getConfig();
   const eventCfg = config.events["approval.created"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 
@@ -22,7 +22,7 @@ export async function handleApprovalDecided(
   ctx: PluginContext,
   event: PluginEvent,
 ): Promise<void> {
-  const config = await getConfig(ctx, event.companyId);
+  const config = getConfig();
   const eventCfg = config.events["approval.decided"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 

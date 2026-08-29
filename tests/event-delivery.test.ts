@@ -29,7 +29,7 @@ beforeEach(() => {
 });
 
 describe("worker event delivery", () => {
-  it("loads configuration in the event company scope, not during startup", async () => {
+  it("uses the configuration cached on config changes without calling config.get during events", async () => {
     const harness = createTestHarness({
       manifest,
       config: {
@@ -42,7 +42,15 @@ describe("worker event delivery", () => {
     const getConfig = vi.spyOn(harness.ctx.config, "get");
 
     await plugin.definition.setup(harness.ctx);
-    expect(getConfig).not.toHaveBeenCalled();
+    expect(getConfig).toHaveBeenCalledOnce();
+    expect(getConfig).toHaveBeenCalledWith();
+
+    await plugin.definition.onConfigChanged?.({
+      slackBotToken: "xoxb-test-token",
+      events: {
+        "issue.created": { enabled: true, channels: ["#general"] },
+      },
+    });
 
     await harness.emit(
       "issue.created",
@@ -50,7 +58,7 @@ describe("worker event delivery", () => {
       { entityId: "iss_scope", entityType: "issue", companyId: "company-test" },
     );
 
-    expect(getConfig).toHaveBeenCalledWith("company-test");
+    expect(getConfig).toHaveBeenCalledOnce();
   });
 
   it("posts a Slack notification for issue.created events", async () => {
