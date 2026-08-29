@@ -29,6 +29,30 @@ beforeEach(() => {
 });
 
 describe("worker event delivery", () => {
+  it("loads configuration in the event company scope, not during startup", async () => {
+    const harness = createTestHarness({
+      manifest,
+      config: {
+        slackBotToken: "xoxb-test-token",
+        events: {
+          "issue.created": { enabled: true, channels: ["#general"] },
+        },
+      },
+    });
+    const getConfig = vi.spyOn(harness.ctx.config, "get");
+
+    await plugin.definition.setup(harness.ctx);
+    expect(getConfig).not.toHaveBeenCalled();
+
+    await harness.emit(
+      "issue.created",
+      { issue: { id: "iss_scope", title: "Scoped config" } },
+      { entityId: "iss_scope", entityType: "issue", companyId: "company-test" },
+    );
+
+    expect(getConfig).toHaveBeenCalledWith("company-test");
+  });
+
   it("posts a Slack notification for issue.created events", async () => {
     const harness = createTestHarness({
       manifest,

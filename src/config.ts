@@ -1,3 +1,4 @@
+import type { PluginContext } from "@paperclipai/plugin-sdk";
 import type { PluginConfig } from "./types.js";
 
 const defaultConfig: PluginConfig = {
@@ -19,14 +20,11 @@ const defaultConfig: PluginConfig = {
   },
 };
 
-let currentConfig: PluginConfig = { ...defaultConfig };
+const configsByContext = new Map<PluginContext, Map<string, PluginConfig>>();
+let latestConfig: PluginConfig = { ...defaultConfig };
 
-export function getConfig(): PluginConfig {
-  return currentConfig;
-}
-
-export function setConfig(partial: Partial<PluginConfig>): void {
-  currentConfig = {
+function resolveConfig(partial: Partial<PluginConfig>): PluginConfig {
+  const config: PluginConfig = {
     ...defaultConfig,
     ...partial,
     paperclipUrl: partial.paperclipUrl || defaultConfig.paperclipUrl,
@@ -35,12 +33,61 @@ export function setConfig(partial: Partial<PluginConfig>): void {
       ...(partial.events ?? {}),
     },
   };
+
   for (const key of Object.keys(defaultConfig.events) as Array<keyof PluginConfig["events"]>) {
     if (partial.events?.[key]) {
-      currentConfig.events[key] = {
+      config.events[key] = {
         ...defaultConfig.events[key],
         ...partial.events[key],
       };
     }
   }
+
+  return config;
+}
+
+export async function getConfig(
+  ctx: PluginContext,
+  companyId: string,
+): Promise<PluginConfig> {
+  const configsByCompany = configsByContext.get(ctx) ?? new Map();
+  configsByContext.set(ctx, configsByCompany);
+
+  const cached = configsByCompany.get(companyId);
+  if (cached) return cached;
+
+  const config = resolveConfig(
+    (await ctx.config.get(companyId)) as Partial<PluginConfig>,
+  );
+  configsByCompany.set(companyId, config);
+  latestConfig = config;
+  return config;
+}
+
+export function initializeConfigCache(ctx: PluginContext): void {
+  configsByContext.set(ctx, new Map());
+}
+
+export function getLatestConfig(): PluginConfig {
+  return latestConfig;
+}
+
+export function setConfig(
+  partial: Partial<PluginConfig>,
+  companyId?: string | null,
+): PluginConfig {
+  const config = resolveConfig(partial);
+  latestConfig = config;
+
+  if (companyId) {
+    for (const configsByCompany of configsByContext.values()) {
+      configsByCompany.set(companyId, config);
+    }
+  } else {
+    for (const configsByCompany of configsByContext.values()) {
+      configsByCompany.clear();
+    }
+  }
+
+  return config;
 }

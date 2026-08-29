@@ -26,7 +26,7 @@ async function handleIssueLifecycle(
   eventKey: "issue.checked_out" | "issue.released",
   lifecycleEvent: "checked_out" | "released",
 ): Promise<void> {
-  const config = getConfig();
+  const config = await getConfig(ctx, event.companyId);
   const eventCfg = config.events[eventKey];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 

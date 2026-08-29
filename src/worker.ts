@@ -5,7 +5,11 @@ import {
   type PluginHealthDiagnostics,
   type PluginConfigValidationResult,
 } from "@paperclipai/plugin-sdk";
-import { setConfig, getConfig } from "./config.js";
+import {
+  getLatestConfig,
+  initializeConfigCache,
+  setConfig,
+} from "./config.js";
 import { registerAllHandlers } from "./events/index.js";
 import { SlackClient } from "./slack/client.js";
 import type { PluginConfig, EventKey } from "./types.js";
@@ -166,23 +170,10 @@ async function validateFullConfig(
 
 const plugin = definePlugin({
   async setup(ctx: PluginContext): Promise<void> {
-    const rawConfig = (await ctx.config.get()) as Record<string, unknown>;
-    setConfig({
-      slackBotToken: (rawConfig.slackBotToken as string) ?? "",
-      paperclipUrl:
-        (rawConfig.paperclipUrl as string) || "http://localhost:3100",
-      events: rawConfig.events as PluginConfig["events"] | undefined,
-    });
-
+    initializeConfigCache(ctx);
     registerAllHandlers(ctx);
 
-    const config = getConfig();
-    ctx.logger.info("Paperclip Slack plugin started", {
-      paperclipUrl: config.paperclipUrl,
-      registeredEvents: Object.entries(config.events)
-        .filter(([, cfg]) => cfg.enabled)
-        .map(([key]) => key),
-    });
+    ctx.logger.info("Paperclip Slack plugin started");
   },
 
   async onValidateConfig(
@@ -205,17 +196,18 @@ const plugin = definePlugin({
 
   async onConfigChanged(
     newConfig: Record<string, unknown>,
+    context,
   ): Promise<void> {
     setConfig({
       slackBotToken: (newConfig.slackBotToken as string) ?? "",
       paperclipUrl:
         (newConfig.paperclipUrl as string) || "http://localhost:3100",
       events: newConfig.events as PluginConfig["events"] | undefined,
-    });
+    }, context?.companyId);
   },
 
   async onHealth(): Promise<PluginHealthDiagnostics> {
-    const config = getConfig();
+    const config = getLatestConfig();
 
     if (!config.slackBotToken || !config.slackBotToken.startsWith("xoxb-")) {
       return {

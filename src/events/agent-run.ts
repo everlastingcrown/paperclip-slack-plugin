@@ -26,7 +26,7 @@ async function handleAgentRunStatus(
   eventKey: "agent.run.finished" | "agent.run.cancelled",
   status: "finished" | "cancelled",
 ): Promise<void> {
-  const config = getConfig();
+  const config = await getConfig(ctx, event.companyId);
   const eventCfg = config.events[eventKey];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 

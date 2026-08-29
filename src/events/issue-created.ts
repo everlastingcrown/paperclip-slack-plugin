@@ -9,7 +9,7 @@ export async function handleIssueCreated(
   ctx: PluginContext,
   event: PluginEvent,
 ): Promise<void> {
-  const config = getConfig();
+  const config = await getConfig(ctx, event.companyId);
   const eventCfg = config.events["issue.created"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 

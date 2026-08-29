@@ -11,22 +11,22 @@ export async function handleApprovalCreated(
   ctx: PluginContext,
   event: PluginEvent,
 ): Promise<void> {
-  const config = getConfig();
+  const config = await getConfig(ctx, event.companyId);
   const eventCfg = config.events["approval.created"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 
-  await handleApproval(ctx, event, "created", eventCfg.channels);
+  await handleApproval(ctx, event, "created", eventCfg.channels, config);
 }
 
 export async function handleApprovalDecided(
   ctx: PluginContext,
   event: PluginEvent,
 ): Promise<void> {
-  const config = getConfig();
+  const config = await getConfig(ctx, event.companyId);
   const eventCfg = config.events["approval.decided"];
   if (!eventCfg.enabled || eventCfg.channels.length === 0) return;
 
-  await handleApproval(ctx, event, "decided", eventCfg.channels);
+  await handleApproval(ctx, event, "decided", eventCfg.channels, config);
 }
 
 async function handleApproval(
@@ -34,8 +34,8 @@ async function handleApproval(
   event: PluginEvent,
   kind: "created" | "decided",
   channels: string[],
+  config: Awaited<ReturnType<typeof getConfig>>,
 ): Promise<void> {
-  const config = getConfig();
   const companyId = event.companyId;
 
   try {

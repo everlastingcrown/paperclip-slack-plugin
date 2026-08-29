@@ -66,7 +66,7 @@ export async function reportEventProcessingError(
 
   ctx.logger.error("Could not process Paperclip event for Slack notification", logContext);
 
-  const config = getConfig();
+  const config = await getConfig(ctx, event.companyId);
   const formatter = new SlackFormatter(config.paperclipUrl);
   const message = formatter.eventProcessingError({
     eventId: event.eventId,

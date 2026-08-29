@@ -38,7 +38,7 @@
     "@paperclipai/plugin-sdk": "*"
   },
   "devDependencies": {
-    "@paperclipai/plugin-sdk": "2026.618.0",
+    "@paperclipai/plugin-sdk": "2026.824.1",
     "@slack/types": "^2.14.0",
     "esbuild": "^0.25.0",
     "semantic-release": "^25.0.5",
