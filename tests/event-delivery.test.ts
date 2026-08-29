@@ -42,8 +42,7 @@ describe("worker event delivery", () => {
     const getConfig = vi.spyOn(harness.ctx.config, "get");
 
     await plugin.definition.setup(harness.ctx);
-    expect(getConfig).toHaveBeenCalledOnce();
-    expect(getConfig).toHaveBeenCalledWith();
+    expect(getConfig).not.toHaveBeenCalled();
 
     await plugin.definition.onConfigChanged?.({
       slackBotToken: "xoxb-test-token",
@@ -58,7 +57,7 @@ describe("worker event delivery", () => {
       { entityId: "iss_scope", entityType: "issue", companyId: "company-test" },
     );
 
-    expect(getConfig).toHaveBeenCalledOnce();
+    expect(getConfig).not.toHaveBeenCalled();
   });
 
   it("posts a Slack notification for issue.created events", async () => {
@@ -654,6 +653,14 @@ describe("worker event delivery", () => {
     });
 
     await plugin.definition.setup(harness.ctx);
+    await plugin.definition.onConfigChanged?.({
+      slackBotToken: "xoxb-test-token",
+      paperclipUrl: "https://paperclip.example",
+      events: {
+        "issue.checked_out": { enabled: true, channels: ["#general"] },
+        "issue.released": { enabled: true, channels: ["#general"] },
+      },
+    });
     await harness.emit(
       "issue.checked_out",
       { issue: { id: "iss_lifecycle", title: "Lifecycle target" } },
@@ -696,6 +703,14 @@ describe("worker event delivery", () => {
     });
 
     await plugin.definition.setup(harness.ctx);
+    await plugin.definition.onConfigChanged?.({
+      slackBotToken: "xoxb-test-token",
+      paperclipUrl: "https://paperclip.example",
+      events: {
+        "agent.run.finished": { enabled: true, channels: ["#general"] },
+        "agent.run.cancelled": { enabled: true, channels: ["#general"] },
+      },
+    });
     await harness.emit(
       "agent.run.finished",
       {
@@ -743,6 +758,13 @@ describe("worker event delivery", () => {
     });
 
     await plugin.definition.setup(harness.ctx);
+    await plugin.definition.onConfigChanged?.({
+      slackBotToken: "xoxb-test-token",
+      paperclipUrl: "https://paperclip.example",
+      events: {
+        "agent.run.finished": { enabled: true, channels: ["#general"] },
+      },
+    });
     await harness.emit(
       "agent.run.finished",
       {
@@ -783,6 +805,14 @@ describe("worker event delivery", () => {
     });
 
     await plugin.definition.setup(harness.ctx);
+    await plugin.definition.onConfigChanged?.({
+      slackBotToken: "xoxb-test-token",
+      paperclipUrl: "https://paperclip.example",
+      events: {
+        "budget.incident.opened": { enabled: true, channels: ["#general"] },
+        "budget.incident.resolved": { enabled: true, channels: ["#general"] },
+      },
+    });
     await harness.emit(
       "budget.incident.opened",
       {

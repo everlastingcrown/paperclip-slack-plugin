@@ -7,7 +7,6 @@ import {
 } from "@paperclipai/plugin-sdk";
 import {
   getLatestConfig,
-  initializeConfigCache,
   setConfig,
 } from "./config.js";
 import { registerAllHandlers } from "./events/index.js";
@@ -170,7 +169,6 @@ async function validateFullConfig(
 
 const plugin = definePlugin({
   async setup(ctx: PluginContext): Promise<void> {
-    await initializeConfigCache(ctx);
     registerAllHandlers(ctx);
 
     ctx.logger.info("Paperclip Slack plugin started");

@@ -1,4 +1,3 @@
-import type { PluginContext } from "@paperclipai/plugin-sdk";
 import type { PluginConfig } from "./types.js";
 
 const defaultConfig: PluginConfig = {
@@ -55,11 +54,6 @@ function resolveConfig(partial: Partial<PluginConfig>): PluginConfig {
  */
 export function getConfig(): PluginConfig {
   return latestConfig;
-}
-
-/** Load the initial config while setup has an authorized host invocation. */
-export async function initializeConfigCache(ctx: PluginContext): Promise<void> {
-  setConfig((await ctx.config.get()) as Partial<PluginConfig>);
 }
 
 export function getLatestConfig(): PluginConfig {
